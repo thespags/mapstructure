@@ -25,9 +25,8 @@ func (e *joinedError) Error() string {
 		len(e.Errors), strings.Join(points, "\n"))
 }
 
-// WrappedErrors implements the errwrap.Wrapper interface to make this
-// return value more useful with the errwrap and go-multierror libraries.
-func (e *joinedError) WrappedErrors() []error {
+// Unwrap implements the Unwrap function added in Go 1.20.
+func (e *joinedError) Unwrap() []error {
 	if e == nil {
 		return nil
 	}
@@ -40,6 +39,7 @@ func (e *joinedError) WrappedErrors() []error {
 	return result
 }
 
+// TODO: replace with errors.Join when Go 1.20 is minimum version.
 func appendErrors(errors []string, err error) []string {
 	switch e := err.(type) {
 	case *joinedError:
