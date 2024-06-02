@@ -7,13 +7,13 @@ import (
 	"strings"
 )
 
-// Error implements the error interface and can represents multiple
+// joinedError implements the error interface and can represents multiple
 // errors that occur in the course of a single decode.
-type Error struct {
+type joinedError struct {
 	Errors []string
 }
 
-func (e *Error) Error() string {
+func (e *joinedError) Error() string {
 	points := make([]string, len(e.Errors))
 	for i, err := range e.Errors {
 		points[i] = fmt.Sprintf("* %s", err)
@@ -27,7 +27,7 @@ func (e *Error) Error() string {
 
 // WrappedErrors implements the errwrap.Wrapper interface to make this
 // return value more useful with the errwrap and go-multierror libraries.
-func (e *Error) WrappedErrors() []error {
+func (e *joinedError) WrappedErrors() []error {
 	if e == nil {
 		return nil
 	}
@@ -42,7 +42,7 @@ func (e *Error) WrappedErrors() []error {
 
 func appendErrors(errors []string, err error) []string {
 	switch e := err.(type) {
-	case *Error:
+	case *joinedError:
 		return append(errors, e.Errors...)
 	default:
 		return append(errors, e.Error())

@@ -2323,9 +2323,9 @@ func TestInvalidType(t *testing.T) {
 		t.Fatal("error should exist")
 	}
 
-	derr, ok := err.(*Error)
+	derr, ok := err.(*joinedError)
 	if !ok {
-		t.Fatalf("error should be kind of Error, instead: %#v", err)
+		t.Fatalf("error should be kind of joinedError, instead: %#v", err)
 	}
 
 	if derr.Errors[0] !=
@@ -2342,9 +2342,9 @@ func TestInvalidType(t *testing.T) {
 		t.Fatal("error should exist")
 	}
 
-	derr, ok = err.(*Error)
+	derr, ok = err.(*joinedError)
 	if !ok {
-		t.Fatalf("error should be kind of Error, instead: %#v", err)
+		t.Fatalf("error should be kind of joinedError, instead: %#v", err)
 	}
 
 	if derr.Errors[0] != "cannot parse 'Vuint', -42 overflows uint" {
@@ -2360,9 +2360,9 @@ func TestInvalidType(t *testing.T) {
 		t.Fatal("error should exist")
 	}
 
-	derr, ok = err.(*Error)
+	derr, ok = err.(*joinedError)
 	if !ok {
-		t.Fatalf("error should be kind of Error, instead: %#v", err)
+		t.Fatalf("error should be kind of joinedError, instead: %#v", err)
 	}
 
 	if derr.Errors[0] != "cannot parse 'Vuint', -42.000000 overflows uint" {
