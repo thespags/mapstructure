@@ -923,7 +923,7 @@ func (d *Decoder) decodeMapFromMap(name string, dataVal reflect.Value, val refle
 
 	// If we had errors, return those
 	if len(errors) > 0 {
-		return &Error{errors}
+		return &joinedError{errors}
 	}
 
 	return nil
@@ -1184,7 +1184,7 @@ func (d *Decoder) decodeSlice(name string, data interface{}, val reflect.Value) 
 
 	// If there were errors, we return those
 	if len(errors) > 0 {
-		return &Error{errors}
+		return &joinedError{errors}
 	}
 
 	return nil
@@ -1250,7 +1250,7 @@ func (d *Decoder) decodeArray(name string, data interface{}, val reflect.Value) 
 
 	// If there were errors, we return those
 	if len(errors) > 0 {
-		return &Error{errors}
+		return &joinedError{errors}
 	}
 
 	return nil
@@ -1495,7 +1495,7 @@ func (d *Decoder) decodeStructFromMap(name string, dataVal, val reflect.Value) e
 	}
 
 	if len(errors) > 0 {
-		return &Error{errors}
+		return &joinedError{errors}
 	}
 
 	// Add the unused keys to the list of unused keys if we're tracking metadata
