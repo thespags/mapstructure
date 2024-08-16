@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"net"
 	"net/netip"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -271,6 +272,35 @@ func TestStringToTimeDurationHookFunc(t *testing.T) {
 		{reflect.ValueOf("5s"), timeValue, 5 * time.Second, false},
 		{reflect.ValueOf("5"), timeValue, time.Duration(0), true},
 		{reflect.ValueOf("5"), strValue, "5", false},
+	}
+
+	for i, tc := range cases {
+		actual, err := DecodeHookExec(f, tc.f, tc.t)
+		if tc.err != (err != nil) {
+			t.Fatalf("case %d: expected err %#v", i, tc.err)
+		}
+		if !reflect.DeepEqual(actual, tc.result) {
+			t.Fatalf(
+				"case %d: expected %#v, got %#v",
+				i, tc.result, actual)
+		}
+	}
+}
+
+func TestStringToURLHookFunc(t *testing.T) {
+	f := StringToURLHookFunc()
+
+	urlSample, _ := url.Parse("http://example.com")
+	urlValue := reflect.ValueOf(urlSample)
+	strValue := reflect.ValueOf("http://example.com")
+	cases := []struct {
+		f, t   reflect.Value
+		result interface{}
+		err    bool
+	}{
+		{reflect.ValueOf("http://example.com"), urlValue, urlSample, false},
+		{reflect.ValueOf("http ://example.com"), urlValue, (*url.URL)(nil), true},
+		{reflect.ValueOf("http://example.com"), strValue, "http://example.com", false},
 	}
 
 	for i, tc := range cases {
