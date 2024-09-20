@@ -278,6 +278,10 @@ type DecoderConfig struct {
 	// field name or tag. Defaults to `strings.EqualFold`. This can be used
 	// to implement case-sensitive tag values, support snake casing, etc.
 	MatchName func(mapKey, fieldName string) bool
+
+	// DecodeNil, if set to true, will cause the DecodeHook (if present) to run
+	// even if the input is nil. This can be used to provide default values.
+	DecodeNil bool
 }
 
 // A Decoder takes a raw interface value and turns it into structured
@@ -451,6 +455,8 @@ func (d *Decoder) decode(name string, input interface{}, outVal reflect.Value) e
 		}
 	}
 
+	decodeNil := d.config.DecodeNil && d.config.DecodeHook != nil
+
 	if input == nil {
 		// If the data is nil, then we don't set anything, unless ZeroFields is set
 		// to true.
@@ -461,17 +467,27 @@ func (d *Decoder) decode(name string, input interface{}, outVal reflect.Value) e
 				d.config.Metadata.Keys = append(d.config.Metadata.Keys, name)
 			}
 		}
-		return nil
+
+		if !decodeNil {
+			return nil
+		}
 	}
 
 	if !inputVal.IsValid() {
-		// If the input value is invalid, then we just set the value
-		// to be the zero value.
-		outVal.Set(reflect.Zero(outVal.Type()))
-		if d.config.Metadata != nil && name != "" {
-			d.config.Metadata.Keys = append(d.config.Metadata.Keys, name)
+		if !decodeNil {
+			// If the input value is invalid, then we just set the value
+			// to be the zero value.
+			outVal.Set(reflect.Zero(outVal.Type()))
+			if d.config.Metadata != nil && name != "" {
+				d.config.Metadata.Keys = append(d.config.Metadata.Keys, name)
+			}
+			return nil
 		}
-		return nil
+
+		// If we get here, we have an untyped nil so the type of the input is assumed.
+		// We do this because all subsequent code requires a valid value for inputVal.
+		var mapVal map[string]interface{}
+		inputVal = reflect.MakeMap(reflect.TypeOf(mapVal))
 	}
 
 	if d.cachedDecodeHook != nil {
