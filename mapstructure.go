@@ -489,14 +489,11 @@ func (d *Decoder) decode(name string, input interface{}, outVal reflect.Value) e
 		// Hooks need a valid inputVal, so reset it to zero value of outVal type.
 		switch outputKind {
 		case reflect.Struct, reflect.Map:
-			// create empty map
 			var mapVal map[string]interface{}
-			inputVal = reflect.ValueOf(mapVal)
-			// inputVal = reflect.MakeMap(reflect.TypeOf(mapVal))
+			inputVal = reflect.ValueOf(mapVal) // create nil map pointer
 		case reflect.Slice, reflect.Array:
-			// create nil slice
 			var sliceVal []interface{}
-			inputVal = reflect.ValueOf(sliceVal)
+			inputVal = reflect.ValueOf(sliceVal) // create nil slice pointer
 		default:
 			inputVal = reflect.Zero(outVal.Type())
 		}
