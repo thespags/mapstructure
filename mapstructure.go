@@ -442,21 +442,26 @@ func (d *Decoder) Decode(input interface{}) error {
 	return err
 }
 
+// isNil returns true if the input is nil or a typed nil pointer.
+func isNil(input interface{}) bool {
+	if input == nil {
+		return true
+	}
+	val := reflect.ValueOf(input)
+	return val.Kind() == reflect.Ptr && val.IsNil()
+}
+
 // Decodes an unknown data type into a specific reflection value.
 func (d *Decoder) decode(name string, input interface{}, outVal reflect.Value) error {
-	var inputVal reflect.Value
-	if input != nil {
-		inputVal = reflect.ValueOf(input)
-
-		// We need to check here if input is a typed nil. Typed nils won't
-		// match the "input == nil" below so we check that here.
-		if inputVal.Kind() == reflect.Ptr && inputVal.IsNil() {
-			input = nil
-		}
+	var (
+		inputVal   = reflect.ValueOf(input)
+		outputKind = getKind(outVal)
+		decodeNil  = d.config.DecodeNil && d.cachedDecodeHook != nil
+	)
+	if isNil(input) {
+		// Typed nils won't match the "input == nil" below, so reset input.
+		input = nil
 	}
-
-	decodeNil := d.config.DecodeNil && d.config.DecodeHook != nil
-
 	if input == nil {
 		// If the data is nil, then we don't set anything, unless ZeroFields is set
 		// to true.
@@ -467,12 +472,10 @@ func (d *Decoder) decode(name string, input interface{}, outVal reflect.Value) e
 				d.config.Metadata.Keys = append(d.config.Metadata.Keys, name)
 			}
 		}
-
 		if !decodeNil {
 			return nil
 		}
 	}
-
 	if !inputVal.IsValid() {
 		if !decodeNil {
 			// If the input value is invalid, then we just set the value
@@ -483,11 +486,17 @@ func (d *Decoder) decode(name string, input interface{}, outVal reflect.Value) e
 			}
 			return nil
 		}
-
-		// If we get here, we have an untyped nil so the type of the input is assumed.
-		// We do this because all subsequent code requires a valid value for inputVal.
-		var mapVal map[string]interface{}
-		inputVal = reflect.MakeMap(reflect.TypeOf(mapVal))
+		// Hooks need a valid inputVal, so reset it to zero value of outVal type.
+		switch outputKind {
+		case reflect.Struct, reflect.Map:
+			var mapVal map[string]interface{}
+			inputVal = reflect.ValueOf(mapVal) // create nil map pointer
+		case reflect.Slice, reflect.Array:
+			var sliceVal []interface{}
+			inputVal = reflect.ValueOf(sliceVal) // create nil slice pointer
+		default:
+			inputVal = reflect.Zero(outVal.Type())
+		}
 	}
 
 	if d.cachedDecodeHook != nil {
@@ -498,9 +507,11 @@ func (d *Decoder) decode(name string, input interface{}, outVal reflect.Value) e
 			return fmt.Errorf("error decoding '%s': %w", name, err)
 		}
 	}
+	if isNil(input) {
+		return nil
+	}
 
 	var err error
-	outputKind := getKind(outVal)
 	addMetaKey := true
 	switch outputKind {
 	case reflect.Bool:
@@ -781,8 +792,8 @@ func (d *Decoder) decodeBool(name string, data interface{}, val reflect.Value) e
 		}
 	default:
 		return fmt.Errorf(
-			"'%s' expected type '%s', got unconvertible type '%s', value: '%v'",
-			name, val.Type(), dataVal.Type(), data)
+			"'%s' expected type '%s', got unconvertible type '%#v', value: '%#v'",
+			name, val, dataVal, data)
 	}
 
 	return nil
