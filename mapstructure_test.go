@@ -3089,7 +3089,6 @@ func TestDecoder_DecodeNilOption(t *testing.T) {
 	type Transformed struct {
 		Message string
 		When    string
-		Boolean *bool //
 	}
 
 	helloHook := func(reflect.Type, reflect.Type, interface{}) (interface{}, error) {

@@ -448,9 +448,7 @@ func isNil(input interface{}) bool {
 		return true
 	}
 	val := reflect.ValueOf(input)
-	k := val.Kind()
-	return (k == reflect.Ptr ||
-		/*k == reflect.Interface || k == reflect.Map || k == reflect.Slice*/ false) && val.IsNil()
+	return val.Kind() == reflect.Ptr && val.IsNil()
 }
 
 // Decodes an unknown data type into a specific reflection value.
@@ -460,12 +458,9 @@ func (d *Decoder) decode(name string, input interface{}, outVal reflect.Value) e
 		outputKind = getKind(outVal)
 		decodeNil  = d.config.DecodeNil && d.cachedDecodeHook != nil
 	)
-	if input != nil {
-		// We need to check here if input is a typed nil. Typed nils won't
-		// match the "input == nil" below so we check that here.
-		if inputVal.Kind() == reflect.Ptr && inputVal.IsNil() {
-			input = nil
-		}
+	if isNil(input) {
+		// Typed nils won't match the "input == nil" below, so reset input.
+		input = nil
 	}
 	if input == nil {
 		// If the data is nil, then we don't set anything, unless ZeroFields is set
