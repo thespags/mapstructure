@@ -3083,12 +3083,13 @@ func TestDecoder_IgnoreUntaggedFieldsWithStruct(t *testing.T) {
 	}
 }
 
-func TestDecoder_CanPerformDecodingForNilInputs(t *testing.T) {
+func TestDecoder_DecodeNilOption(t *testing.T) {
 	t.Parallel()
 
 	type Transformed struct {
 		Message string
 		When    string
+		Boolean *bool //
 	}
 
 	helloHook := func(reflect.Type, reflect.Type, interface{}) (interface{}, error) {
@@ -3100,6 +3101,9 @@ func TestDecoder_CanPerformDecodingForNilInputs(t *testing.T) {
 	appendHook := func(from reflect.Value, to reflect.Value) (interface{}, error) {
 		if from.Kind() == reflect.Map {
 			stringMap := from.Interface().(map[string]interface{})
+			if stringMap == nil {
+				stringMap = make(map[string]interface{})
+			}
 			stringMap["when"] = "see you later"
 			return stringMap, nil
 		}
@@ -3245,6 +3249,67 @@ func TestDecoder_CanPerformDecodingForNilInputs(t *testing.T) {
 				t.Errorf("result should be: %#v, got %#v", test.expectedResult, test.result)
 			}
 		})
+	}
+}
+
+func TestDecoder_ExpandNilStructPointersHookFunc(t *testing.T) {
+	// a decoder hook that expands nil pointers in a struct to their zero value
+	// if the input map contains the corresponding key.
+	decodeHook := func(from reflect.Value, to reflect.Value) (any, error) {
+		if from.Kind() == reflect.Map && to.Kind() == reflect.Map {
+			toElem := to.Type().Elem()
+			if toElem.Kind() == reflect.Ptr && toElem.Elem().Kind() == reflect.Struct {
+				fromRange := from.MapRange()
+				for fromRange.Next() {
+					fromKey := fromRange.Key()
+					fromValue := fromRange.Value()
+					if fromValue.IsNil() {
+						newFromValue := reflect.New(toElem.Elem())
+						from.SetMapIndex(fromKey, newFromValue)
+					}
+				}
+			}
+		}
+		return from.Interface(), nil
+	}
+	type Struct struct {
+		Name string
+	}
+	type TestConfig struct {
+		Boolean   *bool              `mapstructure:"boolean"`
+		Struct    *Struct            `mapstructure:"struct"`
+		MapStruct map[string]*Struct `mapstructure:"map_struct"`
+	}
+	stringMap := map[string]any{
+		"boolean": nil,
+		"struct":  nil,
+		"map_struct": map[string]any{
+			"struct": nil,
+		},
+	}
+	var result TestConfig
+	decoder, err := NewDecoder(&DecoderConfig{
+		Result:     &result,
+		DecodeNil:  true,
+		DecodeHook: decodeHook,
+	})
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+	if err := decoder.Decode(stringMap); err != nil {
+		t.Fatalf("got an err: %s", err)
+	}
+	if result.Boolean != nil {
+		t.Errorf("nil Boolean expected, got '%#v'", result.Boolean)
+	}
+	if result.Struct != nil {
+		t.Errorf("nil Struct expected, got '%#v'", result.Struct)
+	}
+	if len(result.MapStruct) == 0 {
+		t.Fatalf("not-empty MapStruct expected, got '%#v'", result.MapStruct)
+	}
+	if _, ok := result.MapStruct["struct"]; !ok {
+		t.Errorf("MapStruct['struct'] expected")
 	}
 }
 
