@@ -100,7 +100,12 @@ func ComposeDecodeHookFunc(fs ...DecodeHookFunc) DecodeHookFunc {
 			if err != nil {
 				return nil, err
 			}
-			newFrom = reflect.ValueOf(data)
+			if v, ok := data.(reflect.Value); ok {
+				newFrom = v
+				data = v.Interface()
+			} else {
+				newFrom = reflect.ValueOf(data)
+			}
 		}
 
 		return data, nil
