@@ -219,6 +219,36 @@ func TestComposeDecodeHookFunc_safe_nofuncs(t *testing.T) {
 	}
 }
 
+func TestComposeDecodeHookFunc_ReflectValueHook(t *testing.T) {
+	reflectValueHook := func(
+		f reflect.Kind,
+		t reflect.Kind,
+		data interface{},
+	) (interface{}, error) {
+		new := data.(string) + "foo"
+		return reflect.ValueOf(new), nil
+	}
+
+	stringHook := func(
+		f reflect.Kind,
+		t reflect.Kind,
+		data interface{},
+	) (interface{}, error) {
+		return data.(string) + "bar", nil
+	}
+
+	f := ComposeDecodeHookFunc(reflectValueHook, stringHook)
+
+	result, err := DecodeHookExec(
+		f, reflect.ValueOf(""), reflect.ValueOf([]byte("")))
+	if err != nil {
+		t.Fatalf("bad: %s", err)
+	}
+	if result.(string) != "foobar" {
+		t.Fatalf("bad: %#v", result)
+	}
+}
+
 func TestStringToSliceHookFunc(t *testing.T) {
 	f := StringToSliceHookFunc(",")
 
