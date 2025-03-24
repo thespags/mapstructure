@@ -1465,6 +1465,8 @@ func (d *Decoder) decodeStructFromMap(name string, dataVal, val reflect.Value) e
 			}
 
 			if !rawMapVal.IsValid() {
+				// There was no matching key in the map for the value in
+				// the struct. Remember it for potential errors and metadata.
 				if !(d.config.AllowUnsetPointer && fieldValue.Kind() == reflect.Ptr) {
 					targetValKeysUnused[fieldName] = struct{}{}
 				}
