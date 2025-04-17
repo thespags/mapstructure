@@ -1,8 +1,9 @@
 # mapstructure
 
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/go-viper/mapstructure/ci.yaml?branch=main&style=flat-square)](https://github.com/go-viper/mapstructure/actions?query=workflow%3ACI)
-[![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/mod/github.com/go-viper/mapstructure/v2)
-![Go Version](https://img.shields.io/badge/go%20version-%3E=1.18-61CFDD.svg?style=flat-square)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/go-viper/mapstructure/ci.yaml?style=flat-square)](https://github.com/go-viper/mapstructure/actions/workflows/ci.yaml)
+[![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/mod/github.com/go-viper/mapstructure)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/go-viper/mapstructure?style=flat-square&color=61CFDD)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/go-viper/mapstructure/badge?style=flat-square)](https://deps.dev/go/github.com%252Fgo-viper%252Fmapstructure)
 
 mapstructure is a Go library for decoding generic map values to structures
 and vice versa, while providing helpful error handling.
