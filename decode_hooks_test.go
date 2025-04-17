@@ -709,6 +709,42 @@ func TestStringToNetIPAddrPortHookFunc(t *testing.T) {
 	}
 }
 
+func TestStringToNetIPPrefixHookFunc(t *testing.T) {
+	strValue := reflect.ValueOf("5")
+	prefixValue := reflect.ValueOf(netip.Prefix{})
+	cases := []struct {
+		f, t   reflect.Value
+		result interface{}
+		err    bool
+	}{
+		{
+			reflect.ValueOf("192.0.2.1/24"), prefixValue,
+			netip.PrefixFrom(netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01}), 24),
+			false,
+		},
+		{
+			reflect.ValueOf("fd7a:115c::626b:430b/118"), prefixValue,
+			netip.PrefixFrom(netip.AddrFrom16([16]byte{0xfd, 0x7a, 0x11, 0x5c, 12: 0x62, 0x6b, 0x43, 0x0b}), 118),
+			false,
+		},
+		{strValue, prefixValue, netip.Prefix{}, true},
+		{strValue, strValue, "5", false},
+	}
+
+	for i, tc := range cases {
+		f := StringToNetIPPrefixHookFunc()
+		actual, err := DecodeHookExec(f, tc.f, tc.t)
+		if tc.err != (err != nil) {
+			t.Fatalf("case %d: expected err %#v", i, tc.err)
+		}
+		if !reflect.DeepEqual(actual, tc.result) {
+			t.Fatalf(
+				"case %d:\nexpected %#v,\ngot      %#v",
+				i, tc.result, actual)
+		}
+	}
+}
+
 func TestStringToBasicTypeHookFunc(t *testing.T) {
 	strValue := reflect.ValueOf("42")
 

@@ -390,6 +390,26 @@ func StringToNetIPAddrPortHookFunc() DecodeHookFunc {
 	}
 }
 
+// StringToNetIPPrefixHookFunc returns a DecodeHookFunc that converts
+// strings to netip.Prefix.
+func StringToNetIPPrefixHookFunc() DecodeHookFunc {
+	return func(
+		f reflect.Type,
+		t reflect.Type,
+		data interface{},
+	) (interface{}, error) {
+		if f.Kind() != reflect.String {
+			return data, nil
+		}
+		if t != reflect.TypeOf(netip.Prefix{}) {
+			return data, nil
+		}
+
+		// Convert it by parsing
+		return netip.ParsePrefix(data.(string))
+	}
+}
+
 // StringToBasicTypeHookFunc returns a DecodeHookFunc that converts
 // strings to basic types.
 // int8, uint8, int16, uint16, int32, uint32, int64, uint64, int, uint, float32, float64, bool, byte, rune, complex64, complex128
