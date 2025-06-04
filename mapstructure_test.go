@@ -255,6 +255,21 @@ type StructWithOmitEmpty struct {
 	OmitNestedField    *Nested                `mapstructure:"omittable-nested,omitempty"`
 }
 
+type StructWithOmitZero struct {
+	VisibleStringField string                 `mapstructure:"visible-string"`
+	OmitStringField    string                 `mapstructure:"omittable-string,omitzero"`
+	VisibleIntField    int                    `mapstructure:"visible-int"`
+	OmitIntField       int                    `mapstructure:"omittable-int,omitzero"`
+	VisibleFloatField  float64                `mapstructure:"visible-float"`
+	OmitFloatField     float64                `mapstructure:"omittable-float,omitzero"`
+	VisibleSliceField  []interface{}          `mapstructure:"visible-slice"`
+	OmitSliceField     []interface{}          `mapstructure:"omittable-slice,omitzero"`
+	VisibleMapField    map[string]interface{} `mapstructure:"visible-map"`
+	OmitMapField       map[string]interface{} `mapstructure:"omittable-map,omitzero"`
+	NestedField        *Nested                `mapstructure:"visible-nested"`
+	OmitNestedField    *Nested                `mapstructure:"omittable-nested,omitzero"`
+}
+
 type TypeConversionResult struct {
 	IntToFloat         float32
 	IntToUint          uint
@@ -2922,6 +2937,88 @@ func TestDecode_StructTaggedWithOmitempty_KeepNonEmptyValues(t *testing.T) {
 		"omittable-map":    map[string]interface{}{"k": "v"},
 		"visible-nested":   emptyNested,
 		"omittable-nested": &Nested{},
+	}
+
+	actual := &map[string]interface{}{}
+	Decode(input, actual)
+
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("Decode() expected: %#v, got: %#v", expected, actual)
+	}
+}
+
+func TestDecode_StructTaggedWithOmitzero_KeepNonZeroValues(t *testing.T) {
+	t.Parallel()
+
+	input := &StructWithOmitZero{
+		VisibleStringField: "",
+		OmitStringField:    "string",
+		VisibleIntField:    0,
+		OmitIntField:       1,
+		VisibleFloatField:  0.0,
+		OmitFloatField:     1.0,
+		VisibleSliceField:  nil,
+		OmitSliceField:     []interface{}{},
+		VisibleMapField:    nil,
+		OmitMapField:       map[string]interface{}{},
+		NestedField:        nil,
+		OmitNestedField:    &Nested{},
+	}
+
+	var emptySlice []interface{}
+	var emptyMap map[string]interface{}
+	var emptyNested *Nested
+	expected := &map[string]interface{}{
+		"visible-string":   "",
+		"omittable-string": "string",
+		"visible-int":      0,
+		"omittable-int":    1,
+		"visible-float":    0.0,
+		"omittable-float":  1.0,
+		"visible-slice":    emptySlice,
+		"omittable-slice":  []interface{}{},
+		"visible-map":      emptyMap,
+		"omittable-map":    map[string]interface{}{},
+		"visible-nested":   emptyNested,
+		"omittable-nested": &Nested{},
+	}
+
+	actual := &map[string]interface{}{}
+	Decode(input, actual)
+
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("Decode() expected: %#v, got: %#v", expected, actual)
+	}
+}
+
+func TestDecode_StructTaggedWithOmitzero_DropZeroValues(t *testing.T) {
+	t.Parallel()
+
+	input := &StructWithOmitZero{
+		VisibleStringField: "",
+		OmitStringField:    "",
+		VisibleIntField:    0,
+		OmitIntField:       0,
+		VisibleFloatField:  0.0,
+		OmitFloatField:     0.0,
+		VisibleSliceField:  nil,
+		OmitSliceField:     nil,
+		VisibleMapField:    nil,
+		OmitMapField:       nil,
+		NestedField:        nil,
+		OmitNestedField:    nil,
+	}
+
+	var emptySlice []interface{}
+	var emptyMap map[string]interface{}
+	var emptyNested *Nested
+	expected := &map[string]interface{}{
+		"visible-string": "",
+		"visible-int":    0,
+		"visible-float":  0.0,
+		"visible-slice":  emptySlice,
+		"visible-map":    emptyMap,
+		"visible-nested": emptyNested,
 	}
 
 	actual := &map[string]interface{}{}
