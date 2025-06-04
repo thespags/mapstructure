@@ -115,15 +115,17 @@
 //
 // When decoding from a struct to any other value, you may use the
 // ",omitempty" suffix on your tag to omit that value if it equates to
-// the zero value. The zero value of all types is specified in the Go
-// specification.
+// the zero value, or a zero-length element. The zero value of all types is
+// specified in the Go specification.
 //
 // For example, the zero type of a numeric type is zero ("0"). If the struct
 // field value is zero and a numeric type, the field is empty, and it won't
-// be encoded into the destination type.
+// be encoded into the destination type. And likewise for the URLs field, if the
+// slice is nil or empty, it won't be encoded into the destination type.
 //
 //	type Source struct {
-//	    Age int `mapstructure:",omitempty"`
+//	    Age  int      `mapstructure:",omitempty"`
+//	    URLs []string `mapstructure:",omitempty"`
 //	}
 //
 // # Unexported fields
