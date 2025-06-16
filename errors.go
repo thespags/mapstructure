@@ -7,8 +7,6 @@ import (
 
 // Error interface is implemented by all errors emitted by mapstructure.
 //
-// Errors from underlying libraries MAY not be wrapped.
-//
 // Use [errors.As] to check if an error implements this interface.
 type Error interface {
 	error
