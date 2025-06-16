@@ -53,7 +53,7 @@ type ParseError struct {
 }
 
 func (e *ParseError) Error() string {
-	return fmt.Sprintf("cannot parse '%s' as '%s': %s", e.Value, e.Expected.Type(), e.Err)
+	return fmt.Sprintf("cannot parse value as '%s': %s", e.Expected.Type(), e.Err)
 }
 
 func (*ParseError) mapstructure() {}
@@ -67,10 +67,9 @@ type UnconvertibleTypeError struct {
 
 func (e *UnconvertibleTypeError) Error() string {
 	return fmt.Sprintf(
-		"expected type '%s', got unconvertible type '%s', value: '%v'",
+		"expected type '%s', got unconvertible type '%s'",
 		e.Expected.Type(),
 		reflect.TypeOf(e.Value),
-		e.Value,
 	)
 }
 
