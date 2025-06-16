@@ -39,7 +39,7 @@ func (e *DecodeError) Unwrap() error {
 }
 
 func (e *DecodeError) Error() string {
-	return fmt.Sprintf("decoding '%s': %s", e.name, e.err)
+	return fmt.Sprintf("'%s' %s", e.name, e.err)
 }
 
 func (*DecodeError) mapstructure() {}
