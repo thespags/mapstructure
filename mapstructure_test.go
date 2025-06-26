@@ -3,6 +3,7 @@ package mapstructure
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"reflect"
 	"sort"
@@ -3437,6 +3438,63 @@ func TestDecoder_ExpandNilStructPointersHookFunc(t *testing.T) {
 	}
 	if _, ok := result.MapStruct["struct"]; !ok {
 		t.Errorf("MapStruct['struct'] expected")
+	}
+}
+
+func TestErrorLeakageWeakDecode(t *testing.T) {
+	cases := []struct {
+		value         interface{}
+		target        interface{}
+		allowNilError bool
+	}{
+		// case 0
+		{"testing", new(bool), false},
+		{"testing", new(int8), false},
+		{"testing", new(uint8), false},
+		{"testing", new(int16), false},
+		{"testing", new(uint16), false},
+		// case 5
+		{"testing", new(int32), false},
+		{"testing", new(uint32), false},
+		{"testing", new(int64), false},
+		{"testing", new(uint64), false},
+		{"testing", new(int), false},
+		// case 10
+		{"testing", new(uint), false},
+		{"testing", new(float32), false},
+		{"testing", new(float64), false},
+		{"testing", new(complex64), false},
+		{"testing", new(complex128), false},
+		// case 15
+		{"testing", new(time.Duration), true},
+		{"testing", new(time.Time), true},
+		{map[string]string{"key": "secret-testing"}, new(map[string]int), false},
+		{map[string]string{"key": "secret-testing"}, new(struct{ Key int }), false},
+		{"secret-testing", new([]int), false},
+		// case 20
+		{"secret-testing", new([4]int), false},
+	}
+
+	for i, tc := range cases {
+		err := WeakDecode(tc.value, tc.target)
+		if err == nil {
+			if tc.allowNilError {
+				continue
+			}
+
+			t.Fatalf("case %d: expected error from input %v:\n\toutput (%T): %#v\n\toutput (string): %v", i, tc.value, tc.target, tc.target, tc.target)
+		}
+
+		strValue := fmt.Sprintf("%v", tc.value)
+		if strings.Contains(strValue, "secret-testing") {
+			strValue = "secret-testing"
+		}
+
+		if strings.Contains(err.Error(), strValue) {
+			t.Errorf("case %d: error contains input value\n\terr: %v\n\tinput: %v", i, err, strValue)
+		} else {
+			t.Logf("case %d: got safe error: %v", i, err)
+		}
 	}
 }
 

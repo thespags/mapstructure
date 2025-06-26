@@ -3,6 +3,7 @@ package mapstructure
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"net"
 	"net/netip"
@@ -1292,6 +1293,87 @@ func TestStringToComplex128HookFunc(t *testing.T) {
 			t.Fatalf(
 				"case %d: expected %#v, got %#v",
 				i, tc.result, actual)
+		}
+	}
+}
+
+type unmarshaler struct{}
+
+func (u *unmarshaler) UnmarshalText(text []byte) error {
+	return fmt.Errorf("this error contains the input: %v", string(text))
+}
+
+func TestErrorLeakageDecodeHook(t *testing.T) {
+	u := unmarshaler{}
+
+	cases := []struct {
+		value         interface{}
+		target        interface{}
+		hook          DecodeHookFunc
+		allowNilError bool
+	}{
+		// case 0
+		{1234, []string{}, StringToSliceHookFunc(","), true},
+		{"testing", time.Second, StringToTimeDurationHookFunc(), false},
+		{":testing", &url.URL{}, StringToURLHookFunc(), false},
+		{"testing", net.IP{}, StringToIPHookFunc(), false},
+		{"testing", net.IPNet{}, StringToIPNetHookFunc(), false},
+		// case 5
+		{"testing", time.Time{}, StringToTimeHookFunc(time.RFC3339), false},
+		{"testing", time.Time{}, StringToTimeHookFunc(time.RFC3339), false},
+		{true, true, WeaklyTypedHook, true},
+		{true, "string", WeaklyTypedHook, true},
+		{1.0, "string", WeaklyTypedHook, true},
+		// case 10
+		{1, "string", WeaklyTypedHook, true},
+		{[]uint8{0x00}, "string", WeaklyTypedHook, true},
+		{uint(0), "string", WeaklyTypedHook, true},
+		{struct{}{}, struct{}{}, RecursiveStructToMapHookFunc(), true},
+		{"testing", u, TextUnmarshallerHookFunc(), false},
+		// case 15
+		{"testing", netip.Addr{}, StringToNetIPAddrHookFunc(), false},
+		{"testing:testing", netip.AddrPort{}, StringToNetIPAddrPortHookFunc(), false},
+		{"testing", netip.Prefix{}, StringToNetIPPrefixHookFunc(), false},
+		{"testing", int8(0), StringToInt8HookFunc(), false},
+		{"testing", uint8(0), StringToUint8HookFunc(), false},
+		// case 20
+		{"testing", int16(0), StringToInt16HookFunc(), false},
+		{"testing", uint16(0), StringToUint16HookFunc(), false},
+		{"testing", int32(0), StringToInt32HookFunc(), false},
+		{"testing", uint32(0), StringToUint32HookFunc(), false},
+		{"testing", int64(0), StringToInt64HookFunc(), false},
+		// case 25
+		{"testing", uint64(0), StringToUint64HookFunc(), false},
+		{"testing", int(0), StringToIntHookFunc(), false},
+		{"testing", uint(0), StringToUintHookFunc(), false},
+		{"testing", float32(0), StringToFloat32HookFunc(), false},
+		{"testing", float64(0), StringToFloat64HookFunc(), false},
+		// case 30
+		{"testing", true, StringToBoolHookFunc(), false},
+		{"testing", byte(0), StringToByteHookFunc(), false},
+		{"testing", rune(0), StringToRuneHookFunc(), false},
+		{"testing", complex64(0), StringToComplex64HookFunc(), false},
+		{"testing", complex128(0), StringToComplex128HookFunc(), false},
+	}
+
+	for i, tc := range cases {
+		value := reflect.ValueOf(tc.value)
+		target := reflect.ValueOf(tc.target)
+		output, err := DecodeHookExec(tc.hook, value, target)
+
+		if err == nil {
+			if tc.allowNilError {
+				continue
+			}
+
+			t.Fatalf("case %d: expected error from input %v:\n\toutput (%T): %#v\n\toutput (string): %v", i, tc.value, output, output, output)
+		}
+
+		strValue := fmt.Sprintf("%v", tc.value)
+		if strings.Contains(err.Error(), strValue) {
+			t.Errorf("case %d: error contains input value\n\terr: %v\n\tinput: %v", i, err, strValue)
+		} else {
+			t.Logf("case %d: got safe error: %v", i, err)
 		}
 	}
 }
