@@ -1297,16 +1297,7 @@ func TestStringToComplex128HookFunc(t *testing.T) {
 	}
 }
 
-type unmarshaler struct{}
-
-func (u *unmarshaler) UnmarshalText(text []byte) error {
-	return fmt.Errorf("this error contains the input: %v", string(text))
-}
-
 func TestErrorLeakageDecodeHook(t *testing.T) {
-	u := unmarshaler{}
-	_ = u
-
 	cases := []struct {
 		value         interface{}
 		target        interface{}
@@ -1331,7 +1322,6 @@ func TestErrorLeakageDecodeHook(t *testing.T) {
 		{uint(0), "string", WeaklyTypedHook, true},
 		{struct{}{}, struct{}{}, RecursiveStructToMapHookFunc(), true},
 		{"testing", netip.Addr{}, StringToNetIPAddrHookFunc(), false},
-		// {"testing", u, TextUnmarshallerHookFunc(), false},
 		// case 15
 		{"testing:testing", netip.AddrPort{}, StringToNetIPAddrPortHookFunc(), false},
 		{"testing", netip.Prefix{}, StringToNetIPPrefixHookFunc(), false},
