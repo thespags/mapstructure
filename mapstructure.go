@@ -724,7 +724,7 @@ func (d *Decoder) decodeInt(name string, data interface{}, val reflect.Value) er
 			return newDecodeError(name, &ParseError{
 				Expected: val,
 				Value:    data,
-				Err:      err,
+				Err:      wrapStrconvNumError(err),
 			})
 		}
 	case dataType.PkgPath() == "encoding/json" && dataType.Name() == "Number":
@@ -795,7 +795,7 @@ func (d *Decoder) decodeUint(name string, data interface{}, val reflect.Value) e
 			return newDecodeError(name, &ParseError{
 				Expected: val,
 				Value:    data,
-				Err:      err,
+				Err:      wrapStrconvNumError(err),
 			})
 		}
 	case dataType.PkgPath() == "encoding/json" && dataType.Name() == "Number":
@@ -805,7 +805,7 @@ func (d *Decoder) decodeUint(name string, data interface{}, val reflect.Value) e
 			return newDecodeError(name, &ParseError{
 				Expected: val,
 				Value:    data,
-				Err:      err,
+				Err:      wrapStrconvNumError(err),
 			})
 		}
 		val.SetUint(i)
@@ -842,7 +842,7 @@ func (d *Decoder) decodeBool(name string, data interface{}, val reflect.Value) e
 			return newDecodeError(name, &ParseError{
 				Expected: val,
 				Value:    data,
-				Err:      err,
+				Err:      wrapStrconvNumError(err),
 			})
 		}
 	default:
@@ -886,7 +886,7 @@ func (d *Decoder) decodeFloat(name string, data interface{}, val reflect.Value) 
 			return newDecodeError(name, &ParseError{
 				Expected: val,
 				Value:    data,
-				Err:      err,
+				Err:      wrapStrconvNumError(err),
 			})
 		}
 	case dataType.PkgPath() == "encoding/json" && dataType.Name() == "Number":
