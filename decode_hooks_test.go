@@ -14,6 +14,88 @@ import (
 	"time"
 )
 
+type decodeHookTestSuite[F any, T any] struct {
+	fn   DecodeHookFunc
+	ok   []decodeHookTestCase[F, T]
+	fail []decodeHookFailureTestCase[F, T]
+}
+
+func (ts decodeHookTestSuite[F, T]) Run(t *testing.T) {
+	t.Run("OK", func(t *testing.T) {
+		t.Parallel()
+
+		for _, tc := range ts.ok {
+			tc := tc
+
+			t.Run("", func(t *testing.T) {
+				t.Parallel()
+
+				tc.Run(t, ts.fn)
+			})
+		}
+	})
+
+	t.Run("Fail", func(t *testing.T) {
+		t.Parallel()
+
+		for _, tc := range ts.ok {
+			tc := tc
+
+			t.Run("", func(t *testing.T) {
+				t.Parallel()
+
+				tc.Run(t, ts.fn)
+			})
+		}
+	})
+
+	t.Run("NoOp", func(t *testing.T) {
+		t.Parallel()
+
+		var zero F
+
+		actual, err := DecodeHookExec(ts.fn, reflect.ValueOf(zero), reflect.ValueOf(zero))
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		if !reflect.DeepEqual(actual, zero) {
+			t.Fatalf("expected %[1]T(%#[1]v), got %[2]T(%#[2]v)", zero, actual)
+		}
+	})
+}
+
+type decodeHookTestCase[F any, T any] struct {
+	from     F
+	expected T
+}
+
+func (tc decodeHookTestCase[F, T]) Run(t *testing.T, fn DecodeHookFunc) {
+	var to T
+
+	actual, err := DecodeHookExec(fn, reflect.ValueOf(tc.from), reflect.ValueOf(to))
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	if !reflect.DeepEqual(actual, tc.expected) {
+		t.Fatalf("expected %[1]T(%#[1]v), got %[2]T(%#[2]v)", tc.expected, actual)
+	}
+}
+
+type decodeHookFailureTestCase[F any, T any] struct {
+	from F
+}
+
+func (tc decodeHookFailureTestCase[F, T]) Run(t *testing.T, fn DecodeHookFunc) {
+	var to T
+
+	_, err := DecodeHookExec(fn, reflect.ValueOf(tc.from), reflect.ValueOf(to))
+	if err == nil {
+		t.Fatalf("expected error, got none")
+	}
+}
+
 func TestComposeDecodeHookFunc(t *testing.T) {
 	f1 := func(
 		f reflect.Kind,
@@ -789,40 +871,26 @@ func TestStringToBasicTypeHookFunc(t *testing.T) {
 }
 
 func TestStringToInt8HookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("42")
-	int8Value := reflect.ValueOf(int8(0))
-
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{strValue, int8Value, int8(42), false},
-		{strValue, strValue, "42", false},
-		{reflect.ValueOf(strings.Repeat("42", 42)), int8Value, int8(0), true},
-		{reflect.ValueOf("42.42"), int8Value, int8(0), true},
-		{reflect.ValueOf("-42"), int8Value, int8(-42), false},
-		{reflect.ValueOf("0b101010"), int8Value, int8(42), false},
-		{reflect.ValueOf("052"), int8Value, int8(42), false},
-		{reflect.ValueOf("0o52"), int8Value, int8(42), false},
-		{reflect.ValueOf("0x2a"), int8Value, int8(42), false},
-		{reflect.ValueOf("0X2A"), int8Value, int8(42), false},
-		{reflect.ValueOf("0"), int8Value, int8(0), false},
-		{reflect.ValueOf("0.0"), int8Value, int8(0), true},
+	suite := decodeHookTestSuite[string, int8]{
+		fn: StringToInt8HookFunc(),
+		ok: []decodeHookTestCase[string, int8]{
+			{"42", 42},
+			{"-42", int8(-42)},
+			{"0b101010", int8(42)},
+			{"052", int8(42)},
+			{"0o52", int8(42)},
+			{"0x2a", int8(42)},
+			{"0X2A", int8(42)},
+			{"0", int8(0)},
+		},
+		fail: []decodeHookFailureTestCase[string, int8]{
+			{strings.Repeat("42", 42)},
+			{"42.42"},
+			{"0.0"},
+		},
 	}
 
-	for i, tc := range cases {
-		f := StringToInt8HookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, tc.err)
-		}
-		if !tc.err && !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToUint8HookFunc(t *testing.T) {
