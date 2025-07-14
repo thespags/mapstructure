@@ -868,7 +868,6 @@ func TestStructToMapHookFuncTabled(t *testing.T) {
 }
 
 func TestTextUnmarshallerHookFunc(t *testing.T) {
-
 	type MyString string
 
 	cases := []struct {
