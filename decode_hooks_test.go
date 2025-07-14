@@ -401,32 +401,19 @@ func TestStringToTimeDurationHookFunc(t *testing.T) {
 }
 
 func TestStringToURLHookFunc(t *testing.T) {
-	f := StringToURLHookFunc()
-
 	urlSample, _ := url.Parse("http://example.com")
-	urlValue := reflect.ValueOf(urlSample)
-	strValue := reflect.ValueOf("http://example.com")
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{reflect.ValueOf("http://example.com"), urlValue, urlSample, false},
-		{reflect.ValueOf("http ://example.com"), urlValue, (*url.URL)(nil), true},
-		{reflect.ValueOf("http://example.com"), strValue, "http://example.com", false},
+
+	suite := decodeHookTestSuite[string, *url.URL]{
+		fn: StringToURLHookFunc(),
+		ok: []decodeHookTestCase[string, *url.URL]{
+			{"http://example.com", urlSample},
+		},
+		fail: []decodeHookFailureTestCase[string, *url.URL]{
+			{"http ://example.com"},
+		},
 	}
 
-	for i, tc := range cases {
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, tc.err)
-		}
-		if !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToTimeHookFunc(t *testing.T) {
@@ -461,33 +448,17 @@ func TestStringToTimeHookFunc(t *testing.T) {
 }
 
 func TestStringToIPHookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("5")
-	ipValue := reflect.ValueOf(net.IP{})
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{
-			reflect.ValueOf("1.2.3.4"), ipValue,
-			net.IPv4(0x01, 0x02, 0x03, 0x04), false,
+	suite := decodeHookTestSuite[string, net.IP]{
+		fn: StringToIPHookFunc(),
+		ok: []decodeHookTestCase[string, net.IP]{
+			{"1.2.3.4", net.IPv4(0x01, 0x02, 0x03, 0x04)},
 		},
-		{strValue, ipValue, net.IP{}, true},
-		{strValue, strValue, "5", false},
+		fail: []decodeHookFailureTestCase[string, net.IP]{
+			{"5"},
+		},
 	}
 
-	for i, tc := range cases {
-		f := StringToIPHookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, tc.err)
-		}
-		if !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToIPNetHookFunc(t *testing.T) {
@@ -733,99 +704,46 @@ func TestTextUnmarshallerHookFunc(t *testing.T) {
 }
 
 func TestStringToNetIPAddrHookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("5")
-	addrValue := reflect.ValueOf(netip.Addr{})
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{
-			reflect.ValueOf("192.0.2.1"), addrValue,
-			netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01}), false,
+	suite := decodeHookTestSuite[string, netip.Addr]{
+		fn: StringToNetIPAddrHookFunc(),
+		ok: []decodeHookTestCase[string, netip.Addr]{
+			{"192.0.2.1", netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01})},
 		},
-		{strValue, addrValue, netip.Addr{}, true},
-		{strValue, strValue, "5", false},
+		fail: []decodeHookFailureTestCase[string, netip.Addr]{
+			{"5"},
+		},
 	}
 
-	for i, tc := range cases {
-		f := StringToNetIPAddrHookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, tc.err)
-		}
-		if !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToNetIPAddrPortHookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("5")
-	addrPortValue := reflect.ValueOf(netip.AddrPort{})
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{
-			reflect.ValueOf("192.0.2.1:80"), addrPortValue,
-			netip.AddrPortFrom(netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01}), 80), false,
+	suite := decodeHookTestSuite[string, netip.AddrPort]{
+		fn: StringToNetIPAddrPortHookFunc(),
+		ok: []decodeHookTestCase[string, netip.AddrPort]{
+			{"192.0.2.1:80", netip.AddrPortFrom(netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01}), 80)},
 		},
-		{strValue, addrPortValue, netip.AddrPort{}, true},
-		{strValue, strValue, "5", false},
+		fail: []decodeHookFailureTestCase[string, netip.AddrPort]{
+			{"5"},
+		},
 	}
 
-	for i, tc := range cases {
-		f := StringToNetIPAddrPortHookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, tc.err)
-		}
-		if !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToNetIPPrefixHookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("5")
-	prefixValue := reflect.ValueOf(netip.Prefix{})
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{
-			reflect.ValueOf("192.0.2.1/24"), prefixValue,
-			netip.PrefixFrom(netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01}), 24),
-			false,
+	suite := decodeHookTestSuite[string, netip.Prefix]{
+		fn: StringToNetIPPrefixHookFunc(),
+		ok: []decodeHookTestCase[string, netip.Prefix]{
+			{"192.0.2.1/24", netip.PrefixFrom(netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01}), 24)},
+			{"fd7a:115c::626b:430b/118", netip.PrefixFrom(netip.AddrFrom16([16]byte{0xfd, 0x7a, 0x11, 0x5c, 12: 0x62, 0x6b, 0x43, 0x0b}), 118)},
 		},
-		{
-			reflect.ValueOf("fd7a:115c::626b:430b/118"), prefixValue,
-			netip.PrefixFrom(netip.AddrFrom16([16]byte{0xfd, 0x7a, 0x11, 0x5c, 12: 0x62, 0x6b, 0x43, 0x0b}), 118),
-			false,
+		fail: []decodeHookFailureTestCase[string, netip.Prefix]{
+			{"5"},
 		},
-		{strValue, prefixValue, netip.Prefix{}, true},
-		{strValue, strValue, "5", false},
 	}
 
-	for i, tc := range cases {
-		f := StringToNetIPPrefixHookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, tc.err)
-		}
-		if !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d:\nexpected %#v,\ngot      %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToBasicTypeHookFunc(t *testing.T) {
