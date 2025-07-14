@@ -894,262 +894,164 @@ func TestStringToInt8HookFunc(t *testing.T) {
 }
 
 func TestStringToUint8HookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("42")
-	uint8Value := reflect.ValueOf(uint8(0))
-
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{strValue, uint8Value, uint8(42), false},
-		{strValue, strValue, "42", false},
-		{reflect.ValueOf(strings.Repeat("42", 42)), uint8Value, uint8(0), true},
-		{reflect.ValueOf("42.42"), uint8Value, uint8(0), true},
-		{reflect.ValueOf("-42"), uint8Value, uint8(0), true},
-		{reflect.ValueOf("0b101010"), uint8Value, uint8(42), false},
-		{reflect.ValueOf("052"), uint8Value, uint8(42), false},
-		{reflect.ValueOf("0o52"), uint8Value, uint8(42), false},
-		{reflect.ValueOf("0x2a"), uint8Value, uint8(42), false},
-		{reflect.ValueOf("0X2A"), uint8Value, uint8(42), false},
-		{reflect.ValueOf("0"), uint8Value, uint8(0), false},
-		{reflect.ValueOf("0.0"), uint8Value, uint8(0), true},
+	suite := decodeHookTestSuite[string, uint8]{
+		fn: StringToUint8HookFunc(),
+		ok: []decodeHookTestCase[string, uint8]{
+			{"42", 42},
+			{"0b101010", uint8(42)},
+			{"052", uint8(42)},
+			{"0o52", uint8(42)},
+			{"0x2a", uint8(42)},
+			{"0X2A", uint8(42)},
+			{"0", uint8(0)},
+		},
+		fail: []decodeHookFailureTestCase[string, uint8]{
+			{strings.Repeat("42", 42)},
+			{"42.42"},
+			{"-42"},
+			{"0.0"},
+		},
 	}
 
-	for i, tc := range cases {
-		f := StringToUint8HookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, tc.err)
-		}
-		if !tc.err && !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToInt16HookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("42")
-	int16Value := reflect.ValueOf(int16(0))
-
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{strValue, int16Value, int16(42), false},
-		{strValue, strValue, "42", false},
-		{reflect.ValueOf(strings.Repeat("42", 42)), int16Value, int16(0), true},
-		{reflect.ValueOf("42.42"), int16Value, int16(0), true},
-		{reflect.ValueOf("-42"), int16Value, int16(-42), false},
-		{reflect.ValueOf("0b101010"), int16Value, int16(42), false},
-		{reflect.ValueOf("052"), int16Value, int16(42), false},
-		{reflect.ValueOf("0o52"), int16Value, int16(42), false},
-		{reflect.ValueOf("0x2a"), int16Value, int16(42), false},
-		{reflect.ValueOf("0X2A"), int16Value, int16(42), false},
-		{reflect.ValueOf("0"), int16Value, int16(0), false},
-		{reflect.ValueOf("0.0"), int16Value, int16(0), true},
+	suite := decodeHookTestSuite[string, int16]{
+		fn: StringToInt16HookFunc(),
+		ok: []decodeHookTestCase[string, int16]{
+			{"42", 42},
+			{"-42", int16(-42)},
+			{"0b101010", int16(42)},
+			{"052", int16(42)},
+			{"0o52", int16(42)},
+			{"0x2a", int16(42)},
+			{"0X2A", int16(42)},
+			{"0", int16(0)},
+		},
+		fail: []decodeHookFailureTestCase[string, int16]{
+			{strings.Repeat("42", 42)},
+			{"42.42"},
+			{"0.0"},
+		},
 	}
 
-	for i, tc := range cases {
-		f := StringToInt16HookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, tc.err)
-		}
-		if !tc.err && !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToUint16HookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("42")
-	uint16Value := reflect.ValueOf(uint16(0))
-
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{strValue, uint16Value, uint16(42), false},
-		{strValue, strValue, "42", false},
-		{reflect.ValueOf(strings.Repeat("42", 42)), uint16Value, uint16(0), true},
-		{reflect.ValueOf("42.42"), uint16Value, uint16(0), true},
-		{reflect.ValueOf("-42"), uint16Value, uint16(0), true},
-		{reflect.ValueOf("0b101010"), uint16Value, uint16(42), false},
-		{reflect.ValueOf("052"), uint16Value, uint16(42), false},
-		{reflect.ValueOf("0o52"), uint16Value, uint16(42), false},
-		{reflect.ValueOf("0x2a"), uint16Value, uint16(42), false},
-		{reflect.ValueOf("0X2A"), uint16Value, uint16(42), false},
-		{reflect.ValueOf("0"), uint16Value, uint16(0), false},
-		{reflect.ValueOf("0.0"), uint16Value, uint16(0), true},
+	suite := decodeHookTestSuite[string, uint16]{
+		fn: StringToUint16HookFunc(),
+		ok: []decodeHookTestCase[string, uint16]{
+			{"42", 42},
+			{"0b101010", uint16(42)},
+			{"052", uint16(42)},
+			{"0o52", uint16(42)},
+			{"0x2a", uint16(42)},
+			{"0X2A", uint16(42)},
+			{"0", uint16(0)},
+		},
+		fail: []decodeHookFailureTestCase[string, uint16]{
+			{strings.Repeat("42", 42)},
+			{"42.42"},
+			{"-42"},
+			{"0.0"},
+		},
 	}
 
-	for i, tc := range cases {
-		f := StringToUint16HookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, tc.err)
-		}
-		if !tc.err && !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToInt32HookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("42")
-	int32Value := reflect.ValueOf(int32(0))
-
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{strValue, int32Value, int32(42), false},
-		{strValue, strValue, "42", false},
-		{reflect.ValueOf(strings.Repeat("42", 42)), int32Value, int32(0), true},
-		{reflect.ValueOf("42.42"), int32Value, int32(0), true},
-		{reflect.ValueOf("-42"), int32Value, int32(-42), false},
-		{reflect.ValueOf("0b101010"), int32Value, int32(42), false},
-		{reflect.ValueOf("052"), int32Value, int32(42), false},
-		{reflect.ValueOf("0o52"), int32Value, int32(42), false},
-		{reflect.ValueOf("0x2a"), int32Value, int32(42), false},
-		{reflect.ValueOf("0X2A"), int32Value, int32(42), false},
-		{reflect.ValueOf("0"), int32Value, int32(0), false},
-		{reflect.ValueOf("0.0"), int32Value, int32(0), true},
+	suite := decodeHookTestSuite[string, int32]{
+		fn: StringToInt32HookFunc(),
+		ok: []decodeHookTestCase[string, int32]{
+			{"42", 42},
+			{"-42", int32(-42)},
+			{"0b101010", int32(42)},
+			{"052", int32(42)},
+			{"0o52", int32(42)},
+			{"0x2a", int32(42)},
+			{"0X2A", int32(42)},
+			{"0", int32(0)},
+		},
+		fail: []decodeHookFailureTestCase[string, int32]{
+			{strings.Repeat("42", 42)},
+			{"42.42"},
+			{"0.0"},
+		},
 	}
 
-	for i, tc := range cases {
-		f := StringToInt32HookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, tc.err)
-		}
-		if !tc.err && !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToUint32HookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("42")
-	uint32Value := reflect.ValueOf(uint32(0))
-
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{strValue, uint32Value, uint32(42), false},
-		{strValue, strValue, "42", false},
-		{reflect.ValueOf(strings.Repeat("42", 42)), uint32Value, uint32(0), true},
-		{reflect.ValueOf("42.42"), uint32Value, uint32(0), true},
-		{reflect.ValueOf("-42"), uint32Value, uint32(0), true},
-		{reflect.ValueOf("0b101010"), uint32Value, uint32(42), false},
-		{reflect.ValueOf("052"), uint32Value, uint32(42), false},
-		{reflect.ValueOf("0o52"), uint32Value, uint32(42), false},
-		{reflect.ValueOf("0x2a"), uint32Value, uint32(42), false},
-		{reflect.ValueOf("0X2A"), uint32Value, uint32(42), false},
-		{reflect.ValueOf("0"), uint32Value, uint32(0), false},
-		{reflect.ValueOf("0.0"), uint32Value, uint32(0), true},
+	suite := decodeHookTestSuite[string, uint32]{
+		fn: StringToUint32HookFunc(),
+		ok: []decodeHookTestCase[string, uint32]{
+			{"42", 42},
+			{"0b101010", uint32(42)},
+			{"052", uint32(42)},
+			{"0o52", uint32(42)},
+			{"0x2a", uint32(42)},
+			{"0X2A", uint32(42)},
+			{"0", uint32(0)},
+		},
+		fail: []decodeHookFailureTestCase[string, uint32]{
+			{strings.Repeat("42", 42)},
+			{"42.42"},
+			{"-42"},
+			{"0.0"},
+		},
 	}
 
-	for i, tc := range cases {
-		f := StringToUint32HookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, tc.err)
-		}
-		if !tc.err && !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToInt64HookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("42")
-	int64Value := reflect.ValueOf(int64(0))
-
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{strValue, int64Value, int64(42), false},
-		{strValue, strValue, "42", false},
-		{reflect.ValueOf(strings.Repeat("42", 42)), int64Value, int64(0), true},
-		{reflect.ValueOf("42.42"), int64Value, int64(0), true},
-		{reflect.ValueOf("-42"), int64Value, int64(-42), false},
-		{reflect.ValueOf("0b101010"), int64Value, int64(42), false},
-		{reflect.ValueOf("052"), int64Value, int64(42), false},
-		{reflect.ValueOf("0o52"), int64Value, int64(42), false},
-		{reflect.ValueOf("0x2a"), int64Value, int64(42), false},
-		{reflect.ValueOf("0X2A"), int64Value, int64(42), false},
-		{reflect.ValueOf("0"), int64Value, int64(0), false},
-		{reflect.ValueOf("0.0"), int64Value, int64(0), true},
+	suite := decodeHookTestSuite[string, int64]{
+		fn: StringToInt64HookFunc(),
+		ok: []decodeHookTestCase[string, int64]{
+			{"42", 42},
+			{"-42", int64(-42)},
+			{"0b101010", int64(42)},
+			{"052", int64(42)},
+			{"0o52", int64(42)},
+			{"0x2a", int64(42)},
+			{"0X2A", int64(42)},
+			{"0", int64(0)},
+		},
+		fail: []decodeHookFailureTestCase[string, int64]{
+			{strings.Repeat("42", 42)},
+			{"42.42"},
+			{"0.0"},
+		},
 	}
 
-	for i, tc := range cases {
-		f := StringToInt64HookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, tc.err)
-		}
-		if !tc.err && !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToUint64HookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("42")
-	uint64Value := reflect.ValueOf(uint64(0))
-
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{strValue, uint64Value, uint64(42), false},
-		{strValue, strValue, "42", false},
-		{reflect.ValueOf(strings.Repeat("42", 42)), uint64Value, uint64(0), true},
-		{reflect.ValueOf("42.42"), uint64Value, uint64(0), true},
-		{reflect.ValueOf("-42"), uint64Value, uint64(0), true},
-		{reflect.ValueOf("0b101010"), uint64Value, uint64(42), false},
-		{reflect.ValueOf("052"), uint64Value, uint64(42), false},
-		{reflect.ValueOf("0o52"), uint64Value, uint64(42), false},
-		{reflect.ValueOf("0x2a"), uint64Value, uint64(42), false},
-		{reflect.ValueOf("0X2A"), uint64Value, uint64(42), false},
-		{reflect.ValueOf("0"), uint64Value, uint64(0), false},
-		{reflect.ValueOf("0.0"), uint64Value, uint64(0), true},
+	suite := decodeHookTestSuite[string, uint64]{
+		fn: StringToUint64HookFunc(),
+		ok: []decodeHookTestCase[string, uint64]{
+			{"42", 42},
+			{"0b101010", uint64(42)},
+			{"052", uint64(42)},
+			{"0o52", uint64(42)},
+			{"0x2a", uint64(42)},
+			{"0X2A", uint64(42)},
+			{"0", uint64(0)},
+		},
+		fail: []decodeHookFailureTestCase[string, uint64]{
+			{strings.Repeat("42", 42)},
+			{"42.42"},
+			{"-42"},
+			{"0.0"},
+		},
 	}
 
-	for i, tc := range cases {
-		f := StringToUint64HookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, tc.err)
-		}
-		if !tc.err && !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToIntHookFunc(t *testing.T) {
@@ -1199,142 +1101,86 @@ func TestStringToUintHookFunc(t *testing.T) {
 }
 
 func TestStringToFloat32HookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("42.42")
-	float32Value := reflect.ValueOf(float32(0))
-
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{strValue, float32Value, float32(42.42), false},
-		{strValue, strValue, "42.42", false},
-		{reflect.ValueOf(strings.Repeat("42", 420)), float32Value, float32(0), true},
-		{reflect.ValueOf("42.42.42"), float32Value, float32(0), true},
-		{reflect.ValueOf("-42.42"), float32Value, float32(-42.42), false},
-		{reflect.ValueOf("0"), float32Value, float32(0), false},
-		{reflect.ValueOf("1e3"), float32Value, float32(1000), false},
-		{reflect.ValueOf("1e-3"), float32Value, float32(0.001), false},
+	suite := decodeHookTestSuite[string, float32]{
+		fn: StringToFloat32HookFunc(),
+		ok: []decodeHookTestCase[string, float32]{
+			{"42.42", float32(42.42)},
+			{"-42.42", float32(-42.42)},
+			{"0", float32(0)},
+			{"1e3", float32(1000)},
+			{"1e-3", float32(0.001)},
+		},
+		fail: []decodeHookFailureTestCase[string, float32]{
+			{strings.Repeat("42", 420)},
+			{"42.42.42"},
+		},
 	}
 
-	for i, tc := range cases {
-		f := StringToFloat32HookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, err)
-		}
-		if !tc.err && !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToFloat64HookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("42.42")
-	float64Value := reflect.ValueOf(float64(0))
-
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{strValue, float64Value, float64(42.42), false},
-		{strValue, strValue, "42.42", false},
-		{reflect.ValueOf(strings.Repeat("42", 420)), float64Value, float64(0), true},
-		{reflect.ValueOf("42.42.42"), float64Value, float64(0), true},
-		{reflect.ValueOf("-42.42"), float64Value, float64(-42.42), false},
-		{reflect.ValueOf("0"), float64Value, float64(0), false},
-		{reflect.ValueOf("0.0"), float64Value, float64(0), false},
-		{reflect.ValueOf("1e3"), float64Value, float64(1000), false},
-		{reflect.ValueOf("1e-3"), float64Value, float64(0.001), false},
+	suite := decodeHookTestSuite[string, float64]{
+		fn: StringToFloat64HookFunc(),
+		ok: []decodeHookTestCase[string, float64]{
+			{"42.42", float64(42.42)},
+			{"-42.42", float64(-42.42)},
+			{"0", float64(0)},
+			{"0.0", float64(0)},
+			{"1e3", float64(1000)},
+			{"1e-3", float64(0.001)},
+		},
+		fail: []decodeHookFailureTestCase[string, float64]{
+			{strings.Repeat("42", 420)},
+			{"42.42.42"},
+		},
 	}
 
-	for i, tc := range cases {
-		f := StringToFloat64HookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, err)
-		}
-		if !tc.err && !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToComplex64HookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("42.42+42.42i")
-	complex64Value := reflect.ValueOf(complex64(0))
-
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{strValue, complex64Value, complex(float32(42.42), float32(42.42)), false},
-		{strValue, strValue, "42.42+42.42i", false},
-		{reflect.ValueOf(strings.Repeat("42", 420)), complex64Value, complex(float32(0), 0), true},
-		{reflect.ValueOf("42.42.42"), complex64Value, complex(float32(0), 0), true},
-		{reflect.ValueOf("-42.42"), complex64Value, complex(float32(-42.42), 0), false},
-		{reflect.ValueOf("0"), complex64Value, complex(float32(0), 0), false},
-		{reflect.ValueOf("0.0"), complex64Value, complex(float32(0), 0), false},
-		{reflect.ValueOf("1e3"), complex64Value, complex(float32(1000), 0), false},
-		{reflect.ValueOf("1e-3"), complex64Value, complex(float32(0.001), 0), false},
-		{reflect.ValueOf("1e3i"), complex64Value, complex(float32(0), 1000), false},
-		{reflect.ValueOf("1e-3i"), complex64Value, complex(float32(0), 0.001), false},
+	suite := decodeHookTestSuite[string, complex64]{
+		fn: StringToComplex64HookFunc(),
+		ok: []decodeHookTestCase[string, complex64]{
+			{"42.42+42.42i", complex(float32(42.42), float32(42.42))},
+			{"-42.42", complex(float32(-42.42), 0)},
+			{"0", complex(float32(0), 0)},
+			{"0.0", complex(float32(0), 0)},
+			{"1e3", complex(float32(1000), 0)},
+			{"1e-3", complex(float32(0.001), 0)},
+			{"1e3i", complex(float32(0), 1000)},
+			{"1e-3i", complex(float32(0), 0.001)},
+		},
+		fail: []decodeHookFailureTestCase[string, complex64]{
+			{strings.Repeat("42", 420)},
+			{"42.42.42"},
+		},
 	}
 
-	for i, tc := range cases {
-		f := StringToComplex64HookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, err)
-		}
-		if !tc.err && !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestStringToComplex128HookFunc(t *testing.T) {
-	strValue := reflect.ValueOf("42.42+42.42i")
-	complex128Value := reflect.ValueOf(complex128(0))
-
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{strValue, complex128Value, complex(42.42, 42.42), false},
-		{strValue, strValue, "42.42+42.42i", false},
-		{reflect.ValueOf(strings.Repeat("42", 420)), complex128Value, complex(0, 0), true},
-		{reflect.ValueOf("42.42.42"), complex128Value, complex(0, 0), true},
-		{reflect.ValueOf("-42.42"), complex128Value, complex(-42.42, 0), false},
-		{reflect.ValueOf("0"), complex128Value, complex(0, 0), false},
-		{reflect.ValueOf("0.0"), complex128Value, complex(0, 0), false},
-		{reflect.ValueOf("1e3"), complex128Value, complex(1000, 0), false},
-		{reflect.ValueOf("1e-3"), complex128Value, complex(0.001, 0), false},
-		{reflect.ValueOf("1e3i"), complex128Value, complex(0, 1000), false},
-		{reflect.ValueOf("1e-3i"), complex128Value, complex(0, 0.001), false},
+	suite := decodeHookTestSuite[string, complex128]{
+		fn: StringToComplex128HookFunc(),
+		ok: []decodeHookTestCase[string, complex128]{
+			{"42.42+42.42i", complex(42.42, 42.42)},
+			{"-42.42", complex(-42.42, 0)},
+			{"0", complex(0, 0)},
+			{"0.0", complex(0, 0)},
+			{"1e3", complex(1000, 0)},
+			{"1e-3", complex(0.001, 0)},
+			{"1e3i", complex(0, 1000)},
+			{"1e-3i", complex(0, 0.001)},
+		},
+		fail: []decodeHookFailureTestCase[string, complex128]{
+			{strings.Repeat("42", 420)},
+			{"42.42.42"},
+		},
 	}
 
-	for i, tc := range cases {
-		f := StringToComplex128HookFunc()
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, err)
-		}
-		if !tc.err && !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
-	}
+	suite.Run(t)
 }
 
 func TestErrorLeakageDecodeHook(t *testing.T) {
