@@ -338,17 +338,17 @@ func TestStringToSliceHookFunc(t *testing.T) {
 	commaSuite := decodeHookTestSuite[string, []string]{
 		fn: StringToSliceHookFunc(","),
 		ok: []decodeHookTestCase[string, []string]{
-			{"foo,bar,baz", []string{"foo", "bar", "baz"}},
-			{"", []string{}},
-			{"single", []string{"single"}},
-			{"one,two", []string{"one", "two"}},
-			{"foo, bar, baz", []string{"foo", " bar", " baz"}}, // Preserves spaces
-			{"foo,,bar", []string{"foo", "", "bar"}},           // Empty elements
-			{",foo,bar,", []string{"", "foo", "bar", ""}},      // Leading/trailing separators
-			{"foo,bar,baz,", []string{"foo", "bar", "baz", ""}},
-			{",foo", []string{"", "foo"}},
-			{"foo,", []string{"foo", ""}},
-			{"a,b,c,d,e,f,g,h,i,j", []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}},
+			{"foo,bar,baz", []string{"foo", "bar", "baz"}}, // Basic comma separation
+			{"", []string{}},                                                                    // Empty string
+			{"single", []string{"single"}},                                                      // Single element
+			{"one,two", []string{"one", "two"}},                                                 // Two elements
+			{"foo, bar, baz", []string{"foo", " bar", " baz"}},                                  // Preserves spaces
+			{"foo,,bar", []string{"foo", "", "bar"}},                                            // Empty elements
+			{",foo,bar,", []string{"", "foo", "bar", ""}},                                       // Leading/trailing separators
+			{"foo,bar,baz,", []string{"foo", "bar", "baz", ""}},                                 // Trailing separator
+			{",foo", []string{"", "foo"}},                                                       // Leading separator only
+			{"foo,", []string{"foo", ""}},                                                       // Trailing separator only
+			{"a,b,c,d,e,f,g,h,i,j", []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}}, // Many elements
 		},
 		fail: []decodeHookFailureTestCase[string, []string]{
 			// StringToSliceHookFunc doesn't have failure cases - it always succeeds
@@ -360,13 +360,13 @@ func TestStringToSliceHookFunc(t *testing.T) {
 	semicolonSuite := decodeHookTestSuite[string, []string]{
 		fn: StringToSliceHookFunc(";"),
 		ok: []decodeHookTestCase[string, []string]{
-			{"foo;bar;baz", []string{"foo", "bar", "baz"}},
-			{"", []string{}},
-			{"single", []string{"single"}},
-			{"one;two", []string{"one", "two"}},
-			{"foo; bar; baz", []string{"foo", " bar", " baz"}},
-			{"foo;;bar", []string{"foo", "", "bar"}},
-			{";foo;bar;", []string{"", "foo", "bar", ""}},
+			{"foo;bar;baz", []string{"foo", "bar", "baz"}}, // Basic semicolon separation
+			{"", []string{}},                                   // Empty string
+			{"single", []string{"single"}},                     // Single element
+			{"one;two", []string{"one", "two"}},                // Two elements
+			{"foo; bar; baz", []string{"foo", " bar", " baz"}}, // Preserves spaces
+			{"foo;;bar", []string{"foo", "", "bar"}},           // Empty elements
+			{";foo;bar;", []string{"", "foo", "bar", ""}},      // Leading/trailing separators
 		},
 		fail: []decodeHookFailureTestCase[string, []string]{},
 	}
@@ -376,10 +376,10 @@ func TestStringToSliceHookFunc(t *testing.T) {
 	pipeSuite := decodeHookTestSuite[string, []string]{
 		fn: StringToSliceHookFunc("|"),
 		ok: []decodeHookTestCase[string, []string]{
-			{"foo|bar|baz", []string{"foo", "bar", "baz"}},
-			{"", []string{}},
-			{"single", []string{"single"}},
-			{"foo||bar", []string{"foo", "", "bar"}},
+			{"foo|bar|baz", []string{"foo", "bar", "baz"}}, // Basic pipe separation
+			{"", []string{}},                         // Empty string
+			{"single", []string{"single"}},           // Single element
+			{"foo||bar", []string{"foo", "", "bar"}}, // Empty elements
 		},
 		fail: []decodeHookFailureTestCase[string, []string]{},
 	}
@@ -389,9 +389,9 @@ func TestStringToSliceHookFunc(t *testing.T) {
 	spaceSuite := decodeHookTestSuite[string, []string]{
 		fn: StringToSliceHookFunc(" "),
 		ok: []decodeHookTestCase[string, []string]{
-			{"foo bar baz", []string{"foo", "bar", "baz"}},
-			{"", []string{}},
-			{"single", []string{"single"}},
+			{"foo bar baz", []string{"foo", "bar", "baz"}}, // Basic space separation
+			{"", []string{}},                         // Empty string
+			{"single", []string{"single"}},           // Single element
 			{"foo  bar", []string{"foo", "", "bar"}}, // Double space creates empty element
 		},
 		fail: []decodeHookFailureTestCase[string, []string]{},
@@ -402,11 +402,11 @@ func TestStringToSliceHookFunc(t *testing.T) {
 	multiCharSuite := decodeHookTestSuite[string, []string]{
 		fn: StringToSliceHookFunc("::"),
 		ok: []decodeHookTestCase[string, []string]{
-			{"foo::bar::baz", []string{"foo", "bar", "baz"}},
-			{"", []string{}},
-			{"single", []string{"single"}},
-			{"foo::::bar", []string{"foo", "", "bar"}},
-			{"::foo::bar::", []string{"", "foo", "bar", ""}},
+			{"foo::bar::baz", []string{"foo", "bar", "baz"}}, // Basic multi-char separation
+			{"", []string{}},                                 // Empty string
+			{"single", []string{"single"}},                   // Single element
+			{"foo::::bar", []string{"foo", "", "bar"}},       // Double separator creates empty element
+			{"::foo::bar::", []string{"", "foo", "bar", ""}}, // Leading/trailing separators
 		},
 		fail: []decodeHookFailureTestCase[string, []string]{},
 	}
@@ -453,43 +453,43 @@ func TestStringToTimeDurationHookFunc(t *testing.T) {
 		fn: StringToTimeDurationHookFunc(),
 		ok: []decodeHookTestCase[string, time.Duration]{
 			// Basic units
-			{"5s", 5 * time.Second},
-			{"10ms", 10 * time.Millisecond},
-			{"100us", 100 * time.Microsecond},
-			{"1000ns", 1000 * time.Nanosecond},
-			{"2m", 2 * time.Minute},
-			{"3h", 3 * time.Hour},
-			{"24h", 24 * time.Hour},
+			{"5s", 5 * time.Second},            // Seconds
+			{"10ms", 10 * time.Millisecond},    // Milliseconds
+			{"100us", 100 * time.Microsecond},  // Microseconds
+			{"1000ns", 1000 * time.Nanosecond}, // Nanoseconds
+			{"2m", 2 * time.Minute},            // Minutes
+			{"3h", 3 * time.Hour},              // Hours
+			{"24h", 24 * time.Hour},            // Day in hours
 
 			// Combinations
-			{"1h30m", time.Hour + 30*time.Minute},
-			{"2h45m30s", 2*time.Hour + 45*time.Minute + 30*time.Second},
-			{"1m30s", time.Minute + 30*time.Second},
-			{"500ms", 500 * time.Millisecond},
-			{"1.5s", time.Second + 500*time.Millisecond},
-			{"2.5h", 2*time.Hour + 30*time.Minute},
+			{"1h30m", time.Hour + 30*time.Minute},                       // Hour and minutes
+			{"2h45m30s", 2*time.Hour + 45*time.Minute + 30*time.Second}, // Multiple units
+			{"1m30s", time.Minute + 30*time.Second},                     // Minutes and seconds
+			{"500ms", 500 * time.Millisecond},                           // Milliseconds only
+			{"1.5s", time.Second + 500*time.Millisecond},                // Fractional seconds
+			{"2.5h", 2*time.Hour + 30*time.Minute},                      // Fractional hours
 
 			// Zero values
-			{"0s", 0},
-			{"0ms", 0},
-			{"0h", 0},
-			{"0", 0},
+			{"0s", 0},  // Zero seconds
+			{"0ms", 0}, // Zero milliseconds
+			{"0h", 0},  // Zero hours
+			{"0", 0},   // Just zero
 
 			// Negative durations
-			{"-5s", -5 * time.Second},
-			{"-1h30m", -(time.Hour + 30*time.Minute)},
-			{"-100ms", -100 * time.Millisecond},
+			{"-5s", -5 * time.Second},                 // Negative seconds
+			{"-1h30m", -(time.Hour + 30*time.Minute)}, // Negative combined
+			{"-100ms", -100 * time.Millisecond},       // Negative milliseconds
 
 			// Fractional values
-			{"0.5s", 500 * time.Millisecond},
-			{"1.25m", time.Minute + 15*time.Second},
-			{"0.1h", 6 * time.Minute},
-			{"2.5ms", 2*time.Millisecond + 500*time.Microsecond},
+			{"0.5s", 500 * time.Millisecond},                     // Half second
+			{"1.25m", time.Minute + 15*time.Second},              // Fractional minute
+			{"0.1h", 6 * time.Minute},                            // Fractional hour
+			{"2.5ms", 2*time.Millisecond + 500*time.Microsecond}, // Fractional millisecond
 
 			// Large values
-			{"8760h", 8760 * time.Hour},       // 1 year
-			{"525600m", 525600 * time.Minute}, // 1 year in minutes
-			{"1000000us", 1000000 * time.Microsecond},
+			{"8760h", 8760 * time.Hour},               // 1 year in hours
+			{"525600m", 525600 * time.Minute},         // 1 year in minutes
+			{"1000000us", 1000000 * time.Microsecond}, // Large microseconds
 
 			// Additional valid cases
 			{".5s", 500 * time.Millisecond},            // Leading decimal is valid
@@ -502,17 +502,17 @@ func TestStringToTimeDurationHookFunc(t *testing.T) {
 			{"abc"},      // Invalid format
 			{""},         // Empty string
 			{"5x"},       // Invalid unit
-			{"5ss"},      // Double unit
-			{"5..5s"},    // Multiple decimals
-			{"++5s"},     // Double plus
-			{"--5s"},     // Double minus
-			{" 5s "},     // Whitespace not handled by time.ParseDuration
-			{"\t10ms\n"}, // Whitespace not handled by time.ParseDuration
-			{"\r1h\r"},   // Whitespace not handled by time.ParseDuration
+			{"5ss"},      // Double unit letters
+			{"5..5s"},    // Multiple decimal points
+			{"++5s"},     // Double plus sign
+			{"--5s"},     // Double minus sign
+			{" 5s "},     // Leading/trailing whitespace not handled
+			{"\t10ms\n"}, // Tab/newline whitespace not handled
+			{"\r1h\r"},   // Carriage return whitespace not handled
 			{"5s "},      // Trailing space after unit
 			{" 5 s"},     // Space before unit
 			{"5 s 10 m"}, // Spaces in combined duration
-			{"∞s"},       // Unicode infinity
+			{"∞s"},       // Unicode infinity symbol
 			{"1y"},       // Unsupported unit (years)
 			{"1w"},       // Unsupported unit (weeks)
 			{"1d"},       // Unsupported unit (days)
@@ -560,23 +560,23 @@ func TestStringToURLHookFunc(t *testing.T) {
 	suite := decodeHookTestSuite[string, *url.URL]{
 		fn: StringToURLHookFunc(),
 		ok: []decodeHookTestCase[string, *url.URL]{
-			{"http://example.com", httpURL},
-			{"https://example.com", httpsURL},
-			{"ftp://ftp.example.com", ftpURL},
-			{"file:///path/to/file", fileURL},
-			{"https://user:pass@example.com:8080/path?query=value&foo=bar#fragment", complexURL},
-			{"http://192.168.1.1:8080", ipURL},
-			{"http://[::1]:8080", ipv6URL},
-			{"", emptyURL},
+			{"http://example.com", httpURL},   // Basic HTTP URL
+			{"https://example.com", httpsURL}, // HTTPS URL
+			{"ftp://ftp.example.com", ftpURL}, // FTP URL
+			{"file:///path/to/file", fileURL}, // File URL
+			{"https://user:pass@example.com:8080/path?query=value&foo=bar#fragment", complexURL}, // Complex URL with all components
+			{"http://192.168.1.1:8080", ipURL},                                                   // IPv4 address with port
+			{"http://[::1]:8080", ipv6URL},                                                       // IPv6 address with port
+			{"", emptyURL},                                                                       // Empty URL
 			// Additional valid cases that url.Parse accepts
-			{"http://", func() *url.URL { u, _ := url.Parse("http://"); return u }()},
-			{"http://example.com:99999", func() *url.URL { u, _ := url.Parse("http://example.com:99999"); return u }()},
-			{"not a url at all", func() *url.URL { u, _ := url.Parse("not a url at all"); return u }()},
+			{"http://", func() *url.URL { u, _ := url.Parse("http://"); return u }()},                                   // Scheme with empty host
+			{"http://example.com:99999", func() *url.URL { u, _ := url.Parse("http://example.com:99999"); return u }()}, // High port number
+			{"not a url at all", func() *url.URL { u, _ := url.Parse("not a url at all"); return u }()},                 // Relative path (valid)
 		},
 		fail: []decodeHookFailureTestCase[string, *url.URL]{
-			{"http ://example.com"},
-			{"://invalid"},
-			{"http://[invalid:ipv6"},
+			{"http ://example.com"},  // Space in scheme
+			{"://invalid"},           // Missing scheme
+			{"http://[invalid:ipv6"}, // Malformed IPv6 bracket
 		},
 	}
 
@@ -619,34 +619,34 @@ func TestStringToIPHookFunc(t *testing.T) {
 		fn: StringToIPHookFunc(),
 		ok: []decodeHookTestCase[string, net.IP]{
 			// IPv4 addresses
-			{"1.2.3.4", net.IPv4(0x01, 0x02, 0x03, 0x04)},
-			{"192.168.1.1", net.IPv4(192, 168, 1, 1)},
-			{"0.0.0.0", net.IPv4(0, 0, 0, 0)},
-			{"255.255.255.255", net.IPv4(255, 255, 255, 255)},
-			{"127.0.0.1", net.IPv4(127, 0, 0, 1)},
-			{"10.0.0.1", net.IPv4(10, 0, 0, 1)},
+			{"1.2.3.4", net.IPv4(0x01, 0x02, 0x03, 0x04)},     // Basic IPv4
+			{"192.168.1.1", net.IPv4(192, 168, 1, 1)},         // Private network address
+			{"0.0.0.0", net.IPv4(0, 0, 0, 0)},                 // Zero address
+			{"255.255.255.255", net.IPv4(255, 255, 255, 255)}, // Broadcast address
+			{"127.0.0.1", net.IPv4(127, 0, 0, 1)},             // Localhost
+			{"10.0.0.1", net.IPv4(10, 0, 0, 1)},               // Private network
 			// IPv6 addresses
-			{"::1", net.ParseIP("::1")},
-			{"2001:db8::1", net.ParseIP("2001:db8::1")},
-			{"fe80::1", net.ParseIP("fe80::1")},
-			{"2001:0db8:85a3:0000:0000:8a2e:0370:7334", net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")},
-			{"2001:db8:85a3::8a2e:370:7334", net.ParseIP("2001:db8:85a3::8a2e:370:7334")},
-			{"::", net.ParseIP("::")},
-			{"::ffff:192.0.2.1", net.ParseIP("::ffff:192.0.2.1")},
+			{"::1", net.ParseIP("::1")},                 // IPv6 localhost
+			{"2001:db8::1", net.ParseIP("2001:db8::1")}, // Documentation address
+			{"fe80::1", net.ParseIP("fe80::1")},         // Link-local address
+			{"2001:0db8:85a3:0000:0000:8a2e:0370:7334", net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")}, // Full IPv6 address
+			{"2001:db8:85a3::8a2e:370:7334", net.ParseIP("2001:db8:85a3::8a2e:370:7334")},                       // Compressed IPv6
+			{"::", net.ParseIP("::")},                             // IPv6 zero address
+			{"::ffff:192.0.2.1", net.ParseIP("::ffff:192.0.2.1")}, // IPv4-mapped IPv6
 		},
 		fail: []decodeHookFailureTestCase[string, net.IP]{
-			{"5"},
-			{"256.1.1.1"},
-			{"1.2.3"},
-			{"1.2.3.4.5"},
-			{"not.an.ip.address"},
-			{""},
-			{"192.168.1.256"},
-			{"192.168.-1.1"},
-			{"gggg::1"},
-			{"2001:db8::1::2"},
-			{"[::1]"},
-			{"192.168.1.1:8080"},
+			{"5"},                 // Single number
+			{"256.1.1.1"},         // IPv4 octet too large
+			{"1.2.3"},             // Too few IPv4 octets
+			{"1.2.3.4.5"},         // Too many IPv4 octets
+			{"not.an.ip.address"}, // Non-numeric text
+			{""},                  // Empty string
+			{"192.168.1.256"},     // Last octet too large
+			{"192.168.-1.1"},      // Negative octet
+			{"gggg::1"},           // Invalid hex in IPv6
+			{"2001:db8::1::2"},    // Double :: in IPv6
+			{"[::1]"},             // IPv6 with brackets (not raw IP)
+			{"192.168.1.1:8080"},  // IPv4 with port
 		},
 	}
 
@@ -701,42 +701,42 @@ func TestWeaklyTypedHook(t *testing.T) {
 		{
 			reflect.ValueOf(false),
 			strValue,
-			"0",
+			"0", // bool false converts to "0"
 			false,
 		},
 
 		{
 			reflect.ValueOf(true),
 			strValue,
-			"1",
+			"1", // bool true converts to "1"
 			false,
 		},
 
 		{
 			reflect.ValueOf(float32(7)),
 			strValue,
-			"7",
+			"7", // float32 converts to string
 			false,
 		},
 
 		{
 			reflect.ValueOf(int(7)),
 			strValue,
-			"7",
+			"7", // int converts to string
 			false,
 		},
 
 		{
 			reflect.ValueOf([]uint8("foo")),
 			strValue,
-			"foo",
+			"foo", // byte slice converts to string
 			false,
 		},
 
 		{
 			reflect.ValueOf(uint(7)),
 			strValue,
-			"7",
+			"7", // uint converts to string
 			false,
 		},
 	}
@@ -901,33 +901,33 @@ func TestStringToNetIPAddrHookFunc(t *testing.T) {
 		fn: StringToNetIPAddrHookFunc(),
 		ok: []decodeHookTestCase[string, netip.Addr]{
 			// IPv4 addresses
-			{"192.0.2.1", netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01})},
-			{"127.0.0.1", netip.AddrFrom4([4]byte{127, 0, 0, 1})},
-			{"0.0.0.0", netip.AddrFrom4([4]byte{0, 0, 0, 0})},
-			{"255.255.255.255", netip.AddrFrom4([4]byte{255, 255, 255, 255})},
-			{"10.0.0.1", netip.AddrFrom4([4]byte{10, 0, 0, 1})},
-			{"192.168.1.100", netip.AddrFrom4([4]byte{192, 168, 1, 100})},
+			{"192.0.2.1", netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01})},   // Documentation address
+			{"127.0.0.1", netip.AddrFrom4([4]byte{127, 0, 0, 1})},             // Localhost
+			{"0.0.0.0", netip.AddrFrom4([4]byte{0, 0, 0, 0})},                 // Zero address
+			{"255.255.255.255", netip.AddrFrom4([4]byte{255, 255, 255, 255})}, // Broadcast address
+			{"10.0.0.1", netip.AddrFrom4([4]byte{10, 0, 0, 1})},               // Private network
+			{"192.168.1.100", netip.AddrFrom4([4]byte{192, 168, 1, 100})},     // Private network
 			// IPv6 addresses
-			{"::1", netip.AddrFrom16([16]byte{15: 1})},
-			{"2001:db8::1", netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8, 12: 0, 0, 0, 1})},
-			{"fe80::1", netip.AddrFrom16([16]byte{0xfe, 0x80, 14: 0, 1})},
-			{"::", netip.AddrFrom16([16]byte{})},
-			{"::ffff:192.0.2.1", netip.AddrFrom16([16]byte{10: 0xff, 0xff, 0xc0, 0x00, 0x02, 0x01})},
+			{"::1", netip.AddrFrom16([16]byte{15: 1})},                                               // IPv6 localhost
+			{"2001:db8::1", netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8, 12: 0, 0, 0, 1})},      // Documentation address
+			{"fe80::1", netip.AddrFrom16([16]byte{0xfe, 0x80, 14: 0, 1})},                            // Link-local address
+			{"::", netip.AddrFrom16([16]byte{})},                                                     // IPv6 zero address
+			{"::ffff:192.0.2.1", netip.AddrFrom16([16]byte{10: 0xff, 0xff, 0xc0, 0x00, 0x02, 0x01})}, // IPv4-mapped IPv6
 		},
 		fail: []decodeHookFailureTestCase[string, netip.Addr]{
-			{"5"},
-			{"256.1.1.1"},
-			{"1.2.3"},
-			{"1.2.3.4.5"},
-			{"not.an.ip.address"},
-			{""},
-			{"192.168.1.256"},
-			{"192.168.-1.1"},
-			{"gggg::1"},
-			{"2001:db8::1::2"},
-			{"[::1]"},
-			{"192.168.1.1:8080"},
-			{"192.168.1.1/24"},
+			{"5"},                 // Single number
+			{"256.1.1.1"},         // IPv4 octet too large
+			{"1.2.3"},             // Too few IPv4 octets
+			{"1.2.3.4.5"},         // Too many IPv4 octets
+			{"not.an.ip.address"}, // Non-numeric text
+			{""},                  // Empty string
+			{"192.168.1.256"},     // Last octet too large
+			{"192.168.-1.1"},      // Negative octet
+			{"gggg::1"},           // Invalid hex in IPv6
+			{"2001:db8::1::2"},    // Double :: in IPv6
+			{"[::1]"},             // IPv6 with brackets
+			{"192.168.1.1:8080"},  // IPv4 with port
+			{"192.168.1.1/24"},    // IPv4 with CIDR
 		},
 	}
 
@@ -939,21 +939,21 @@ func TestStringToNetIPAddrPortHookFunc(t *testing.T) {
 		fn: StringToNetIPAddrPortHookFunc(),
 		ok: []decodeHookTestCase[string, netip.AddrPort]{
 			// IPv4 with ports
-			{"192.0.2.1:80", netip.AddrPortFrom(netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01}), 80)},
-			{"127.0.0.1:8080", netip.AddrPortFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), 8080)},
-			{"10.0.0.1:443", netip.AddrPortFrom(netip.AddrFrom4([4]byte{10, 0, 0, 1}), 443)},
-			{"192.168.1.100:22", netip.AddrPortFrom(netip.AddrFrom4([4]byte{192, 168, 1, 100}), 22)},
-			{"0.0.0.0:0", netip.AddrPortFrom(netip.AddrFrom4([4]byte{0, 0, 0, 0}), 0)},
-			{"255.255.255.255:65535", netip.AddrPortFrom(netip.AddrFrom4([4]byte{255, 255, 255, 255}), 65535)},
+			{"192.0.2.1:80", netip.AddrPortFrom(netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01}), 80)},         // HTTP port
+			{"127.0.0.1:8080", netip.AddrPortFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), 8080)},               // Alternative HTTP port
+			{"10.0.0.1:443", netip.AddrPortFrom(netip.AddrFrom4([4]byte{10, 0, 0, 1}), 443)},                   // HTTPS port
+			{"192.168.1.100:22", netip.AddrPortFrom(netip.AddrFrom4([4]byte{192, 168, 1, 100}), 22)},           // SSH port
+			{"0.0.0.0:0", netip.AddrPortFrom(netip.AddrFrom4([4]byte{0, 0, 0, 0}), 0)},                         // Zero address and port
+			{"255.255.255.255:65535", netip.AddrPortFrom(netip.AddrFrom4([4]byte{255, 255, 255, 255}), 65535)}, // Max address and port
 			// IPv6 with ports
-			{"[::1]:80", netip.AddrPortFrom(netip.AddrFrom16([16]byte{15: 1}), 80)},
-			{"[2001:db8::1]:443", netip.AddrPortFrom(netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8, 12: 0, 0, 0, 1}), 443)},
-			{"[fe80::1]:8080", netip.AddrPortFrom(netip.AddrFrom16([16]byte{0xfe, 0x80, 14: 0, 1}), 8080)},
-			{"[::]:22", netip.AddrPortFrom(netip.AddrFrom16([16]byte{}), 22)},
-			{"[::ffff:192.0.2.1]:80", netip.AddrPortFrom(netip.AddrFrom16([16]byte{10: 0xff, 0xff, 0xc0, 0x00, 0x02, 0x01}), 80)},
+			{"[::1]:80", netip.AddrPortFrom(netip.AddrFrom16([16]byte{15: 1}), 80)},                                               // IPv6 localhost with HTTP
+			{"[2001:db8::1]:443", netip.AddrPortFrom(netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8, 12: 0, 0, 0, 1}), 443)},    // Documentation address with HTTPS
+			{"[fe80::1]:8080", netip.AddrPortFrom(netip.AddrFrom16([16]byte{0xfe, 0x80, 14: 0, 1}), 8080)},                        // Link-local with alt HTTP
+			{"[::]:22", netip.AddrPortFrom(netip.AddrFrom16([16]byte{}), 22)},                                                     // IPv6 zero address with SSH
+			{"[::ffff:192.0.2.1]:80", netip.AddrPortFrom(netip.AddrFrom16([16]byte{10: 0xff, 0xff, 0xc0, 0x00, 0x02, 0x01}), 80)}, // IPv4-mapped IPv6 with HTTP
 		},
 		fail: []decodeHookFailureTestCase[string, netip.AddrPort]{
-			{"5"},
+			{"5"},                  // Just a number
 			{"192.168.1.1"},        // Missing port
 			{"192.168.1.1:"},       // Empty port
 			{"192.168.1.1:65536"},  // Port too large
@@ -978,37 +978,36 @@ func TestStringToNetIPPrefixHookFunc(t *testing.T) {
 		fn: StringToNetIPPrefixHookFunc(),
 		ok: []decodeHookTestCase[string, netip.Prefix]{
 			// IPv4 CIDR notation
-			{"192.0.2.1/24", netip.PrefixFrom(netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01}), 24)},
-			{"127.0.0.1/32", netip.PrefixFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), 32)},
-			{"10.0.0.0/8", netip.PrefixFrom(netip.AddrFrom4([4]byte{10, 0, 0, 0}), 8)},
-			{"192.168.1.0/24", netip.PrefixFrom(netip.AddrFrom4([4]byte{192, 168, 1, 0}), 24)},
-			{"172.16.0.0/12", netip.PrefixFrom(netip.AddrFrom4([4]byte{172, 16, 0, 0}), 12)},
-			{"0.0.0.0/0", netip.PrefixFrom(netip.AddrFrom4([4]byte{0, 0, 0, 0}), 0)},
-			{"255.255.255.255/32", netip.PrefixFrom(netip.AddrFrom4([4]byte{255, 255, 255, 255}), 32)},
-			{"192.168.1.1/30", netip.PrefixFrom(netip.AddrFrom4([4]byte{192, 168, 1, 1}), 30)},
+			{"192.0.2.1/24", netip.PrefixFrom(netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01}), 24)},   // Documentation network
+			{"127.0.0.1/32", netip.PrefixFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), 32)},             // Localhost single host
+			{"10.0.0.0/8", netip.PrefixFrom(netip.AddrFrom4([4]byte{10, 0, 0, 0}), 8)},                 // Class A private network
+			{"192.168.1.0/24", netip.PrefixFrom(netip.AddrFrom4([4]byte{192, 168, 1, 0}), 24)},         // Class C private network
+			{"172.16.0.0/12", netip.PrefixFrom(netip.AddrFrom4([4]byte{172, 16, 0, 0}), 12)},           // Class B private network
+			{"0.0.0.0/0", netip.PrefixFrom(netip.AddrFrom4([4]byte{0, 0, 0, 0}), 0)},                   // Default route
+			{"255.255.255.255/32", netip.PrefixFrom(netip.AddrFrom4([4]byte{255, 255, 255, 255}), 32)}, // Broadcast single host
+			{"192.168.1.1/30", netip.PrefixFrom(netip.AddrFrom4([4]byte{192, 168, 1, 1}), 30)},         // Point-to-point subnet
 			// IPv6 CIDR notation
-			{"fd7a:115c::626b:430b/118", netip.PrefixFrom(netip.AddrFrom16([16]byte{0xfd, 0x7a, 0x11, 0x5c, 12: 0x62, 0x6b, 0x43, 0x0b}), 118)},
-			{"2001:db8::/32", netip.PrefixFrom(netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8}), 32)},
-			{"::1/128", netip.PrefixFrom(netip.AddrFrom16([16]byte{15: 1}), 128)},
-			{"::/0", netip.PrefixFrom(netip.AddrFrom16([16]byte{}), 0)},
-			{"fe80::/10", netip.PrefixFrom(netip.AddrFrom16([16]byte{0xfe, 0x80}), 10)},
-			{"2001:db8::1/64", netip.PrefixFrom(netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8, 12: 0, 0, 0, 1}), 64)},
-			{"::ffff:0:0/96", netip.PrefixFrom(netip.AddrFrom16([16]byte{10: 0xff, 0xff}), 96)},
+			{"fd7a:115c::626b:430b/118", netip.PrefixFrom(netip.AddrFrom16([16]byte{0xfd, 0x7a, 0x11, 0x5c, 12: 0x62, 0x6b, 0x43, 0x0b}), 118)}, // ULA with specific prefix
+			{"2001:db8::/32", netip.PrefixFrom(netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8}), 32)},                                         // Documentation network
+			{"::1/128", netip.PrefixFrom(netip.AddrFrom16([16]byte{15: 1}), 128)},                                                               // IPv6 localhost single host
+			{"::/0", netip.PrefixFrom(netip.AddrFrom16([16]byte{}), 0)},                                                                         // IPv6 default route
+			{"fe80::/10", netip.PrefixFrom(netip.AddrFrom16([16]byte{0xfe, 0x80}), 10)},                                                         // Link-local network
+			{"2001:db8::1/64", netip.PrefixFrom(netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8, 12: 0, 0, 0, 1}), 64)},                        // Standard IPv6 subnet
+			{"::ffff:0:0/96", netip.PrefixFrom(netip.AddrFrom16([16]byte{10: 0xff, 0xff}), 96)},                                                 // IPv4-mapped IPv6 prefix
 		},
 		fail: []decodeHookFailureTestCase[string, netip.Prefix]{
-			{"5"},
-			{"192.168.1.1"},       // Missing prefix length
-			{"192.168.1.1/"},      // Empty prefix length
-			{"192.168.1.1/33"},    // IPv4 prefix too large
-			{"192.168.1.1/-1"},    // Negative prefix
-			{"192.168.1.1/abc"},   // Non-numeric prefix
-			{"256.1.1.1/24"},      // Invalid IP
-			{"192.168.1.1/24/8"},  // Multiple prefixes
-			{"::1/129"},           // IPv6 prefix too large
-			{"invalid::ip/64"},    // Invalid IPv6
-			{""},                  // Empty string
-			{"/24"},               // Missing IP
-			{"192.168.1.1:80/24"}, // IP with port
+			{"5"},                // Just a number
+			{"192.168.1.1"},      // Missing prefix length
+			{"192.168.1.1/"},     // Empty prefix length
+			{"192.168.1.1/33"},   // IPv4 prefix too large
+			{"192.168.1.1/-1"},   // Negative prefix
+			{"192.168.1.1/abc"},  // Non-numeric prefix
+			{"256.1.1.1/24"},     // Invalid IP
+			{"::1/129"},          // IPv6 prefix too large
+			{"invalid::ip/64"},   // Invalid IPv6
+			{""},                 // Empty string
+			{"/24"},              // Missing IP
+			{"192.168.1.1/24/8"}, // Multiple prefixes
 		},
 	}
 
@@ -1061,15 +1060,15 @@ func TestStringToInt8HookFunc(t *testing.T) {
 	suite := decodeHookTestSuite[string, int8]{
 		fn: StringToInt8HookFunc(),
 		ok: []decodeHookTestCase[string, int8]{
-			{"42", 42},
-			{"-42", int8(-42)},
-			{"0b101010", int8(42)},
-			{"052", int8(42)},
-			{"0o52", int8(42)},
-			{"0x2a", int8(42)},
-			{"0X2A", int8(42)},
-			{"0", int8(0)},
-			{"+42", int8(42)},
+			{"42", 42},             // Basic positive decimal
+			{"-42", int8(-42)},     // Basic negative decimal
+			{"0b101010", int8(42)}, // Binary notation
+			{"052", int8(42)},      // Octal notation (legacy)
+			{"0o52", int8(42)},     // Octal notation (modern)
+			{"0x2a", int8(42)},     // Hex notation (lowercase)
+			{"0X2A", int8(42)},     // Hex notation (uppercase)
+			{"0", int8(0)},         // Zero
+			{"+42", int8(42)},      // Explicit positive sign
 			// Boundary values
 			{"127", int8(127)},          // Max value
 			{"-128", int8(-128)},        // Min value
@@ -1080,39 +1079,39 @@ func TestStringToInt8HookFunc(t *testing.T) {
 			{"0b01111111", int8(127)},   // Max value in binary
 			{"-0b10000000", int8(-128)}, // Min value in binary
 			// Zero variants
-			{"+0", int8(0)},
-			{"-0", int8(0)},
-			{"00", int8(0)},
-			{"0x0", int8(0)},
-			{"0b0", int8(0)},
-			{"0o0", int8(0)},
+			{"+0", int8(0)},  // Explicit positive zero
+			{"-0", int8(0)},  // Explicit negative zero
+			{"00", int8(0)},  // Leading zero
+			{"0x0", int8(0)}, // Hex zero
+			{"0b0", int8(0)}, // Binary zero
+			{"0o0", int8(0)}, // Octal zero
 		},
 		fail: []decodeHookFailureTestCase[string, int8]{
-			{strings.Repeat("42", 42)},
-			{"128"},          // Overflow
-			{"-129"},         // Underflow
-			{"256"},          // Way over max
-			{"-256"},         // Way under min
-			{"42.5"},         // Float
-			{"abc"},          // Non-numeric
-			{""},             // Empty string
-			{" 42 "},         // Whitespace not handled by strconv
-			{"\t42\n"},       // Whitespace not handled by strconv
-			{"\r42\r"},       // Whitespace not handled by strconv
-			{"0x"},           // Invalid hex
-			{"0b"},           // Invalid binary
-			{"0o"},           // Invalid octal
-			{"++42"},         // Double plus
-			{"--42"},         // Double minus
-			{"42abc"},        // Trailing non-numeric
-			{"abc42"},        // Leading non-numeric
-			{"42 43"},        // Multiple numbers
-			{"0x10000"},      // Hex overflow
-			{"-0x10001"},     // Hex underflow
-			{"0777"},         // Octal overflow
-			{"-01000"},       // Octal underflow
-			{"0b100000000"},  // Binary overflow
-			{"-0b100000001"}, // Binary underflow
+			{strings.Repeat("42", 42)}, // Very long number string
+			{"128"},                    // Overflow
+			{"-129"},                   // Underflow
+			{"256"},                    // Way over max
+			{"-256"},                   // Way under min
+			{"42.5"},                   // Float
+			{"abc"},                    // Non-numeric
+			{""},                       // Empty string
+			{" 42 "},                   // Whitespace not handled by strconv
+			{"\t42\n"},                 // Whitespace not handled by strconv
+			{"\r42\r"},                 // Whitespace not handled by strconv
+			{"0x"},                     // Invalid hex
+			{"0b"},                     // Invalid binary
+			{"0o"},                     // Invalid octal
+			{"++42"},                   // Double plus
+			{"--42"},                   // Double minus
+			{"42abc"},                  // Trailing non-numeric
+			{"abc42"},                  // Leading non-numeric
+			{"42 43"},                  // Multiple numbers
+			{"0x10000"},                // Hex overflow
+			{"-0x10001"},               // Hex underflow
+			{"0777"},                   // Octal overflow
+			{"-01000"},                 // Octal underflow
+			{"0b100000000"},            // Binary overflow
+			{"-0b100000001"},           // Binary underflow
 		},
 	}
 
@@ -1123,13 +1122,13 @@ func TestStringToUint8HookFunc(t *testing.T) {
 	suite := decodeHookTestSuite[string, uint8]{
 		fn: StringToUint8HookFunc(),
 		ok: []decodeHookTestCase[string, uint8]{
-			{"42", 42},
-			{"0b101010", uint8(42)},
-			{"052", uint8(42)},
-			{"0o52", uint8(42)},
-			{"0x2a", uint8(42)},
-			{"0X2A", uint8(42)},
-			{"0", uint8(0)},
+			{"42", 42},              // Basic decimal
+			{"0b101010", uint8(42)}, // Binary notation
+			{"052", uint8(42)},      // Octal notation (legacy)
+			{"0o52", uint8(42)},     // Octal notation (modern)
+			{"0x2a", uint8(42)},     // Hex notation (lowercase)
+			{"0X2A", uint8(42)},     // Hex notation (uppercase)
+			{"0", uint8(0)},         // Zero
 
 			// Boundary values
 			{"255", uint8(255)},        // Max value
@@ -1139,10 +1138,10 @@ func TestStringToUint8HookFunc(t *testing.T) {
 			{"1", uint8(1)},            // Min positive value
 			// Zero variants
 
-			{"00", uint8(0)},
-			{"0x0", uint8(0)},
-			{"0b0", uint8(0)},
-			{"0o0", uint8(0)},
+			{"00", uint8(0)},  // Leading zero
+			{"0x0", uint8(0)}, // Hex zero
+			{"0b0", uint8(0)}, // Binary zero
+			{"0o0", uint8(0)}, // Octal zero
 		},
 		fail: []decodeHookFailureTestCase[string, uint8]{
 			{strings.Repeat("42", 42)},
@@ -1360,48 +1359,48 @@ func TestStringToFloat32HookFunc(t *testing.T) {
 	suite := decodeHookTestSuite[string, float32]{
 		fn: StringToFloat32HookFunc(),
 		ok: []decodeHookTestCase[string, float32]{
-			{"42.42", float32(42.42)},
-			{"-42.42", float32(-42.42)},
-			{"0", float32(0)},
-			{"1e3", float32(1000)},
-			{"1e-3", float32(0.001)},
+			{"42.42", float32(42.42)},   // Basic decimal
+			{"-42.42", float32(-42.42)}, // Negative decimal
+			{"0", float32(0)},           // Zero as integer
+			{"1e3", float32(1000)},      // Scientific notation
+			{"1e-3", float32(0.001)},    // Small scientific notation
 			// Integer values
-			{"42", float32(42)},
-			{"-42", float32(-42)},
-			{"+42", float32(42)},
+			{"42", float32(42)},   // Positive integer
+			{"-42", float32(-42)}, // Negative integer
+			{"+42", float32(42)},  // Explicit positive integer
 			// Zero variants
-			{"0.0", float32(0.0)},
-			{"+0", float32(0)},
-			{"-0", float32(0)},
-			{"00.00", float32(0)},
+			{"0.0", float32(0.0)}, // Zero with decimal
+			{"+0", float32(0)},    // Explicit positive zero
+			{"-0", float32(0)},    // Explicit negative zero
+			{"00.00", float32(0)}, // Zero with leading zeros
 			// Scientific notation
-			{"1E3", float32(1000)},
-			{"1.5e2", float32(150)},
-			{"1.5E2", float32(150)},
-			{"-1.5e2", float32(-150)},
-			{"1e+3", float32(1000)},
-			{"1e-10", float32(1e-10)},
-			{"3.14159", float32(3.14159)},
-			// Special values
-			{"inf", float32(math.Inf(1))},
-			{"+inf", float32(math.Inf(1))},
-			{"-inf", float32(math.Inf(-1))},
-			{"Inf", float32(math.Inf(1))},
-			{"+Inf", float32(math.Inf(1))},
-			{"-Inf", float32(math.Inf(-1))},
-			{"infinity", float32(math.Inf(1))},
-			{"+infinity", float32(math.Inf(1))},
-			{"-infinity", float32(math.Inf(-1))},
-			{"Infinity", float32(math.Inf(1))},
-			{"+Infinity", float32(math.Inf(1))},
-			{"-Infinity", float32(math.Inf(-1))},
+			{"1E3", float32(1000)},        // Scientific notation (uppercase E)
+			{"1.5e2", float32(150)},       // Fractional base with exponent
+			{"1.5E2", float32(150)},       // Fractional base with uppercase E
+			{"-1.5e2", float32(-150)},     // Negative fractional with exponent
+			{"1e+3", float32(1000)},       // Explicit positive exponent
+			{"1e-10", float32(1e-10)},     // Very small exponent
+			{"3.14159", float32(3.14159)}, // Pi approximation
+			// Special values - infinity
+			{"inf", float32(math.Inf(1))},        // Infinity (lowercase)
+			{"+inf", float32(math.Inf(1))},       // Positive infinity
+			{"-inf", float32(math.Inf(-1))},      // Negative infinity
+			{"Inf", float32(math.Inf(1))},        // Infinity (capitalized)
+			{"+Inf", float32(math.Inf(1))},       // Positive infinity (capitalized)
+			{"-Inf", float32(math.Inf(-1))},      // Negative infinity (capitalized)
+			{"infinity", float32(math.Inf(1))},   // Infinity (full word)
+			{"+infinity", float32(math.Inf(1))},  // Positive infinity (full word)
+			{"-infinity", float32(math.Inf(-1))}, // Negative infinity (full word)
+			{"Infinity", float32(math.Inf(1))},   // Infinity (full word capitalized)
+			{"+Infinity", float32(math.Inf(1))},  // Positive infinity (full word capitalized)
+			{"-Infinity", float32(math.Inf(-1))}, // Negative infinity (full word capitalized)
 			// Decimal variations
-			{".5", float32(0.5)},
-			{"-.5", float32(-0.5)},
-			{"+.5", float32(0.5)},
-			{"5.", float32(5.0)},
-			{"-5.", float32(-5.0)},
-			{"+5.", float32(5.0)},
+			{".5", float32(0.5)},   // Leading decimal point
+			{"-.5", float32(-0.5)}, // Negative leading decimal
+			{"+.5", float32(0.5)},  // Positive leading decimal
+			{"5.", float32(5.0)},   // Trailing decimal point
+			{"-5.", float32(-5.0)}, // Negative trailing decimal
+			{"+5.", float32(5.0)},  // Positive trailing decimal
 			// Very small and large numbers
 			{"1.1754943508222875e-38", float32(1.1754943508222875e-38)}, // Near min positive
 			{"3.4028234663852886e+38", float32(3.4028234663852886e+38)}, // Near max
@@ -1454,49 +1453,48 @@ func TestStringToFloat64HookFunc(t *testing.T) {
 	suite := decodeHookTestSuite[string, float64]{
 		fn: StringToFloat64HookFunc(),
 		ok: []decodeHookTestCase[string, float64]{
-			{"42.42", float64(42.42)},
-			{"-42.42", float64(-42.42)},
-			{"0", float64(0)},
-			{"0.0", float64(0)},
-			{"1e3", float64(1000)},
-			{"1e-3", float64(0.001)},
+			{"42.42", float64(42.42)},   // Basic decimal
+			{"-42.42", float64(-42.42)}, // Negative decimal
+			{"0", float64(0)},           // Zero as integer
+			{"0.0", float64(0)},         // Zero with decimal
+			{"1e3", float64(1000)},      // Scientific notation
+			{"1e-3", float64(0.001)},    // Small scientific notation
 			// Integer values
-			{"42", float64(42)},
-			{"-42", float64(-42)},
-			{"+42", float64(42)},
+			{"42", float64(42)},   // Positive integer
+			{"-42", float64(-42)}, // Negative integer
+			{"+42", float64(42)},  // Explicit positive integer
 			// Zero variants
-			{"+0", float64(0)},
-			{"-0", float64(0)},
-			{"00.00", float64(0)},
+			{"+0", float64(0)},    // Explicit positive zero
+			{"-0", float64(0)},    // Explicit negative zero
+			{"00.00", float64(0)}, // Zero with leading zeros
 			// Scientific notation
-			{"1E3", float64(1000)},
-			{"1.5e2", float64(150)},
-			{"1.5E2", float64(150)},
-			{"-1.5e2", float64(-150)},
-			{"1e+3", float64(1000)},
-			{"1e-15", float64(1e-15)},
-			{"3.141592653589793", float64(3.141592653589793)},
-			// Special values
+			{"1E3", float64(1000)},                            // Scientific notation (uppercase E)
+			{"1.5e2", float64(150)},                           // Fractional base with exponent
+			{"1.5E2", float64(150)},                           // Fractional base with uppercase E
+			{"-1.5e2", float64(-150)},                         // Negative fractional with exponent
+			{"1e+3", float64(1000)},                           // Explicit positive exponent
+			{"1e-15", float64(1e-15)},                         // Very small exponent
+			{"3.141592653589793", float64(3.141592653589793)}, // Pi with high precision
 			// Special values - infinity
-			{"inf", math.Inf(1)},
-			{"+inf", math.Inf(1)},
-			{"-inf", math.Inf(-1)},
-			{"Inf", math.Inf(1)},
-			{"+Inf", math.Inf(1)},
-			{"-Inf", math.Inf(-1)},
-			{"infinity", math.Inf(1)},
-			{"+infinity", math.Inf(1)},
-			{"-infinity", math.Inf(-1)},
-			{"Infinity", math.Inf(1)},
-			{"+Infinity", math.Inf(1)},
-			{"-Infinity", math.Inf(-1)},
+			{"inf", math.Inf(1)},        // Infinity (lowercase)
+			{"+inf", math.Inf(1)},       // Positive infinity
+			{"-inf", math.Inf(-1)},      // Negative infinity
+			{"Inf", math.Inf(1)},        // Infinity (capitalized)
+			{"+Inf", math.Inf(1)},       // Positive infinity (capitalized)
+			{"-Inf", math.Inf(-1)},      // Negative infinity (capitalized)
+			{"infinity", math.Inf(1)},   // Infinity (full word)
+			{"+infinity", math.Inf(1)},  // Positive infinity (full word)
+			{"-infinity", math.Inf(-1)}, // Negative infinity (full word)
+			{"Infinity", math.Inf(1)},   // Infinity (full word capitalized)
+			{"+Infinity", math.Inf(1)},  // Positive infinity (full word capitalized)
+			{"-Infinity", math.Inf(-1)}, // Negative infinity (full word capitalized)
 			// Decimal variations
-			{".5", float64(0.5)},
-			{"-.5", float64(-0.5)},
-			{"+.5", float64(0.5)},
-			{"5.", float64(5.0)},
-			{"-5.", float64(-5.0)},
-			{"+5.", float64(5.0)},
+			{".5", float64(0.5)},   // Leading decimal point
+			{"-.5", float64(-0.5)}, // Negative leading decimal
+			{"+.5", float64(0.5)},  // Positive leading decimal
+			{"5.", float64(5.0)},   // Trailing decimal point
+			{"-5.", float64(-5.0)}, // Negative trailing decimal
+			{"+5.", float64(5.0)},  // Positive trailing decimal
 			// Very small and large numbers
 			{"2.2250738585072014e-308", float64(2.2250738585072014e-308)}, // Near min positive
 			{"1.7976931348623157e+308", float64(1.7976931348623157e+308)}, // Near max
@@ -1545,85 +1543,85 @@ func TestStringToComplex64HookFunc(t *testing.T) {
 		fn: StringToComplex64HookFunc(),
 		ok: []decodeHookTestCase[string, complex64]{
 			// Standard complex numbers
-			{"42.42+42.42i", complex(float32(42.42), float32(42.42))},
-			{"1+2i", complex(float32(1), float32(2))},
-			{"-1-2i", complex(float32(-1), float32(-2))},
-			{"1-2i", complex(float32(1), float32(-2))},
-			{"-1+2i", complex(float32(-1), float32(2))},
+			{"42.42+42.42i", complex(float32(42.42), float32(42.42))}, // Basic complex number
+			{"1+2i", complex(float32(1), float32(2))},                 // Simple complex number
+			{"-1-2i", complex(float32(-1), float32(-2))},              // Negative real and imaginary
+			{"1-2i", complex(float32(1), float32(-2))},                // Positive real, negative imaginary
+			{"-1+2i", complex(float32(-1), float32(2))},               // Negative real, positive imaginary
 			// Real numbers only
-			{"-42.42", complex(float32(-42.42), 0)},
-			{"42", complex(float32(42), 0)},
-			{"+42", complex(float32(42), 0)},
-			{"0", complex(float32(0), 0)},
-			{"0.0", complex(float32(0), 0)},
-			{"+0", complex(float32(0), 0)},
-			{"-0", complex(float32(0), 0)},
+			{"-42.42", complex(float32(-42.42), 0)}, // Negative real number
+			{"42", complex(float32(42), 0)},         // Positive integer
+			{"+42", complex(float32(42), 0)},        // Explicit positive integer
+			{"0", complex(float32(0), 0)},           // Zero
+			{"0.0", complex(float32(0), 0)},         // Zero with decimal
+			{"+0", complex(float32(0), 0)},          // Explicit positive zero
+			{"-0", complex(float32(0), 0)},          // Explicit negative zero
 			// Scientific notation
-			{"1e3", complex(float32(1000), 0)},
-			{"1e-3", complex(float32(0.001), 0)},
-			{"1E3", complex(float32(1000), 0)},
-			{"1e+3", complex(float32(1000), 0)},
-			{"1.5e2", complex(float32(150), 0)},
-			{"-1.5e2", complex(float32(-150), 0)},
+			{"1e3", complex(float32(1000), 0)},    // Scientific notation
+			{"1e-3", complex(float32(0.001), 0)},  // Small scientific notation
+			{"1E3", complex(float32(1000), 0)},    // Uppercase E
+			{"1e+3", complex(float32(1000), 0)},   // Explicit positive exponent
+			{"1.5e2", complex(float32(150), 0)},   // Fractional with exponent
+			{"-1.5e2", complex(float32(-150), 0)}, // Negative fractional with exponent
 			// Imaginary numbers only
-			{"1e3i", complex(float32(0), 1000)},
-			{"1e-3i", complex(float32(0), 0.001)},
-			{"42i", complex(float32(0), 42)},
-			{"-42i", complex(float32(0), -42)},
-			{"+42i", complex(float32(0), 42)},
-			{"0i", complex(float32(0), 0)},
-			{"1i", complex(float32(0), 1)},
-			{"-1i", complex(float32(0), -1)},
-			{"1.5i", complex(float32(0), 1.5)},
+			{"1e3i", complex(float32(0), 1000)},   // Scientific notation imaginary
+			{"1e-3i", complex(float32(0), 0.001)}, // Small scientific notation imaginary
+			{"42i", complex(float32(0), 42)},      // Basic imaginary
+			{"-42i", complex(float32(0), -42)},    // Negative imaginary
+			{"+42i", complex(float32(0), 42)},     // Explicit positive imaginary
+			{"0i", complex(float32(0), 0)},        // Zero imaginary
+			{"1i", complex(float32(0), 1)},        // Unit imaginary
+			{"-1i", complex(float32(0), -1)},      // Negative unit imaginary
+			{"1.5i", complex(float32(0), 1.5)},    // Fractional imaginary
 			// Scientific notation imaginary
-			{"1E3i", complex(float32(0), 1000)},
-			{"1e+3i", complex(float32(0), 1000)},
-			{"1.5e2i", complex(float32(0), 150)},
-			{"-1.5e2i", complex(float32(0), -150)},
+			{"1E3i", complex(float32(0), 1000)},    // Uppercase E imaginary
+			{"1e+3i", complex(float32(0), 1000)},   // Explicit positive exponent imaginary
+			{"1.5e2i", complex(float32(0), 150)},   // Fractional with exponent imaginary
+			{"-1.5e2i", complex(float32(0), -150)}, // Negative fractional with exponent imaginary
 			// Complex with scientific notation
-			{"1e3+2e2i", complex(float32(1000), float32(200))},
-			{"1e-3+2e-2i", complex(float32(0.001), float32(0.02))},
-			{"1.5e2-2.5e1i", complex(float32(150), float32(-25))},
+			{"1e3+2e2i", complex(float32(1000), float32(200))},     // Both parts scientific
+			{"1e-3+2e-2i", complex(float32(0.001), float32(0.02))}, // Both parts small scientific
+			{"1.5e2-2.5e1i", complex(float32(150), float32(-25))},  // Mixed signs with scientific
 			// Decimal variations
-			{".5", complex(float32(0.5), 0)},
-			{"-.5", complex(float32(-0.5), 0)},
-			{"+.5", complex(float32(0.5), 0)},
-			{"5.", complex(float32(5.0), 0)},
-			{"-5.", complex(float32(-5.0), 0)},
-			{"+5.", complex(float32(5.0), 0)},
-			{".5i", complex(float32(0), 0.5)},
-			{"-.5i", complex(float32(0), -0.5)},
-			{"+.5i", complex(float32(0), 0.5)},
-			{"5.i", complex(float32(0), 5.0)},
-			{"-5.i", complex(float32(0), -5.0)},
-			{"+5.i", complex(float32(0), 5.0)},
+			{".5", complex(float32(0.5), 0)},    // Leading decimal point
+			{"-.5", complex(float32(-0.5), 0)},  // Negative leading decimal
+			{"+.5", complex(float32(0.5), 0)},   // Positive leading decimal
+			{"5.", complex(float32(5.0), 0)},    // Trailing decimal point
+			{"-5.", complex(float32(-5.0), 0)},  // Negative trailing decimal
+			{"+5.", complex(float32(5.0), 0)},   // Positive trailing decimal
+			{".5i", complex(float32(0), 0.5)},   // Leading decimal imaginary
+			{"-.5i", complex(float32(0), -0.5)}, // Negative leading decimal imaginary
+			{"+.5i", complex(float32(0), 0.5)},  // Positive leading decimal imaginary
+			{"5.i", complex(float32(0), 5.0)},   // Trailing decimal imaginary
+			{"-5.i", complex(float32(0), -5.0)}, // Negative trailing decimal imaginary
+			{"+5.i", complex(float32(0), 5.0)},  // Positive trailing decimal imaginary
 			// Complex decimal variations
-			{".5+.5i", complex(float32(0.5), float32(0.5))},
-			{"5.+5.i", complex(float32(5.0), float32(5.0))},
-			{".5-.5i", complex(float32(0.5), float32(-0.5))},
+			{".5+.5i", complex(float32(0.5), float32(0.5))},  // Both parts leading decimal
+			{"5.+5.i", complex(float32(5.0), float32(5.0))},  // Both parts trailing decimal
+			{".5-.5i", complex(float32(0.5), float32(-0.5))}, // Leading decimal with negative
 			// Special values - infinity
-			{"inf", complex(float32(math.Inf(1)), 0)},
-			{"+inf", complex(float32(math.Inf(1)), 0)},
-			{"-inf", complex(float32(math.Inf(-1)), 0)},
-			{"Inf", complex(float32(math.Inf(1)), 0)},
-			{"infinity", complex(float32(math.Inf(1)), 0)},
-			{"Infinity", complex(float32(math.Inf(1)), 0)},
-			{"infi", complex(float32(0), float32(math.Inf(1)))},
-			{"+infi", complex(float32(0), float32(math.Inf(1)))},
-			{"-infi", complex(float32(0), float32(math.Inf(-1)))},
-			{"Infi", complex(float32(0), float32(math.Inf(1)))},
-			{"infinityi", complex(float32(0), float32(math.Inf(1)))},
-			{"Infinityi", complex(float32(0), float32(math.Inf(1)))},
+			{"inf", complex(float32(math.Inf(1)), 0)},                // Real infinity
+			{"+inf", complex(float32(math.Inf(1)), 0)},               // Positive real infinity
+			{"-inf", complex(float32(math.Inf(-1)), 0)},              // Negative real infinity
+			{"Inf", complex(float32(math.Inf(1)), 0)},                // Capitalized infinity
+			{"infinity", complex(float32(math.Inf(1)), 0)},           // Full word infinity
+			{"Infinity", complex(float32(math.Inf(1)), 0)},           // Capitalized full word infinity
+			{"infi", complex(float32(0), float32(math.Inf(1)))},      // Imaginary infinity
+			{"+infi", complex(float32(0), float32(math.Inf(1)))},     // Positive imaginary infinity
+			{"-infi", complex(float32(0), float32(math.Inf(-1)))},    // Negative imaginary infinity
+			{"Infi", complex(float32(0), float32(math.Inf(1)))},      // Capitalized imaginary infinity
+			{"infinityi", complex(float32(0), float32(math.Inf(1)))}, // Full word imaginary infinity
+			{"Infinityi", complex(float32(0), float32(math.Inf(1)))}, // Capitalized full word imaginary infinity
 			// Complex with special values
-			{"inf+1i", complex(float32(math.Inf(1)), float32(1))},
-			{"1+infi", complex(float32(1), float32(math.Inf(1)))},
-			{"inf+infi", complex(float32(math.Inf(1)), float32(math.Inf(1)))},
-			{"-inf-infi", complex(float32(math.Inf(-1)), float32(math.Inf(-1)))},
+			{"inf+1i", complex(float32(math.Inf(1)), float32(1))},                // Real infinity with imaginary
+			{"1+infi", complex(float32(1), float32(math.Inf(1)))},                // Real with imaginary infinity
+			{"inf+infi", complex(float32(math.Inf(1)), float32(math.Inf(1)))},    // Both infinities
+			{"-inf-infi", complex(float32(math.Inf(-1)), float32(math.Inf(-1)))}, // Both negative infinities
 			// Parentheses format
-			{"(42+42i)", complex(float32(42), float32(42))},
-			{"(42)", complex(float32(42), float32(0))},
-			{"(42i)", complex(float32(0), float32(42))},
-			{"(-42-42i)", complex(float32(-42), float32(-42))},
+			{"(42+42i)", complex(float32(42), float32(42))},    // Complex in parentheses
+			{"(42)", complex(float32(42), float32(0))},         // Real in parentheses
+			{"(42i)", complex(float32(0), float32(42))},        // Imaginary in parentheses
+			{"(-42-42i)", complex(float32(-42), float32(-42))}, // Negative complex in parentheses
 		},
 		fail: []decodeHookFailureTestCase[string, complex64]{
 			{strings.Repeat("42", 420)},
@@ -1716,52 +1714,52 @@ func TestStringToBoolHookFunc(t *testing.T) {
 		fn: StringToBoolHookFunc(),
 		ok: []decodeHookTestCase[string, bool]{
 			// True values (only those accepted by strconv.ParseBool)
-			{"true", true},
-			{"True", true},
-			{"TRUE", true},
-			{"t", true},
-			{"T", true},
-			{"1", true},
+			{"true", true}, // Boolean true (lowercase)
+			{"True", true}, // Boolean true (capitalized)
+			{"TRUE", true}, // Boolean true (uppercase)
+			{"t", true},    // Single character true (lowercase)
+			{"T", true},    // Single character true (uppercase)
+			{"1", true},    // Numeric true
 
 			// False values (only those accepted by strconv.ParseBool)
-			{"false", false},
-			{"False", false},
-			{"FALSE", false},
-			{"f", false},
-			{"F", false},
-			{"0", false},
+			{"false", false}, // Boolean false (lowercase)
+			{"False", false}, // Boolean false (capitalized)
+			{"FALSE", false}, // Boolean false (uppercase)
+			{"f", false},     // Single character false (lowercase)
+			{"F", false},     // Single character false (uppercase)
+			{"0", false},     // Numeric false
 		},
 		fail: []decodeHookFailureTestCase[string, bool]{
 			{""},           // Empty string
-			{"maybe"},      // Invalid boolean
+			{"maybe"},      // Invalid boolean word
 			{"yes"},        // Not accepted by strconv.ParseBool
 			{"no"},         // Not accepted by strconv.ParseBool
 			{"on"},         // Not accepted by strconv.ParseBool
 			{"off"},        // Not accepted by strconv.ParseBool
 			{"y"},          // Not accepted by strconv.ParseBool
 			{"n"},          // Not accepted by strconv.ParseBool
-			{"yes please"}, // Invalid boolean
-			{"true false"}, // Multiple values
-			{"2"},          // Invalid number
-			{"-1"},         // Invalid number
-			{"10"},         // Invalid number
+			{"yes please"}, // Invalid boolean phrase
+			{"true false"}, // Multiple boolean values
+			{"2"},          // Invalid number (only 0/1 accepted)
+			{"-1"},         // Negative number
+			{"10"},         // Number greater than 1
 			{"abc"},        // Non-boolean text
-			{"True False"}, // Multiple booleans
-			{"1.0"},        // Float
-			{"0.0"},        // Float
-			{"++true"},     // Invalid prefix
-			{"--false"},    // Invalid prefix
-			{"truee"},      // Typo
-			{"fasle"},      // Typo
-			{"tru"},        // Incomplete
-			{"fals"},       // Incomplete
+			{"True False"}, // Multiple boolean values (capitalized)
+			{"1.0"},        // Float representation of 1
+			{"0.0"},        // Float representation of 0
+			{"++true"},     // Double positive prefix
+			{"--false"},    // Double negative prefix
+			{"truee"},      // Typo in true
+			{"fasle"},      // Typo in false
+			{"tru"},        // Incomplete true
+			{"fals"},       // Incomplete false
 			{" true "},     // Whitespace not handled by strconv.ParseBool
-			{"\ttrue\n"},   // Whitespace not handled by strconv.ParseBool
-			{"\rfalse\r"},  // Whitespace not handled by strconv.ParseBool
-			{" 1 "},        // Whitespace not handled by strconv.ParseBool
-			{" 0 "},        // Whitespace not handled by strconv.ParseBool
-			{"∞"},          // Unicode
-			{"тrue"},       // Cyrillic lookalike
+			{"\ttrue\n"},   // Tab and newline whitespace
+			{"\rfalse\r"},  // Carriage return whitespace
+			{" 1 "},        // Whitespace around numeric true
+			{" 0 "},        // Whitespace around numeric false
+			{"∞"},          // Unicode infinity symbol
+			{"тrue"},       // Cyrillic lookalike characters
 		},
 	}
 
@@ -1798,96 +1796,96 @@ func TestStringToComplex128HookFunc(t *testing.T) {
 		fn: StringToComplex128HookFunc(),
 		ok: []decodeHookTestCase[string, complex128]{
 			// Standard complex numbers
-			{"42.42+42.42i", complex(42.42, 42.42)},
-			{"1+2i", complex(1, 2)},
-			{"-1-2i", complex(-1, -2)},
-			{"1-2i", complex(1, -2)},
-			{"-1+2i", complex(-1, 2)},
+			{"42.42+42.42i", complex(42.42, 42.42)}, // Basic complex number
+			{"1+2i", complex(1, 2)},                 // Simple complex number
+			{"-1-2i", complex(-1, -2)},              // Negative real and imaginary
+			{"1-2i", complex(1, -2)},                // Positive real, negative imaginary
+			{"-1+2i", complex(-1, 2)},               // Negative real, positive imaginary
 			// Real numbers only
-			{"-42.42", complex(-42.42, 0)},
-			{"42", complex(42, 0)},
-			{"+42", complex(42, 0)},
-			{"0", complex(0, 0)},
-			{"0.0", complex(0, 0)},
-			{"+0", complex(0, 0)},
-			{"-0", complex(0, 0)},
+			{"-42.42", complex(-42.42, 0)}, // Negative real number
+			{"42", complex(42, 0)},         // Positive integer
+			{"+42", complex(42, 0)},        // Explicit positive integer
+			{"0", complex(0, 0)},           // Zero
+			{"0.0", complex(0, 0)},         // Zero with decimal
+			{"+0", complex(0, 0)},          // Explicit positive zero
+			{"-0", complex(0, 0)},          // Explicit negative zero
 			// Scientific notation
-			{"1e3", complex(1000, 0)},
-			{"1e-3", complex(0.001, 0)},
-			{"1E3", complex(1000, 0)},
-			{"1e+3", complex(1000, 0)},
-			{"1.5e2", complex(150, 0)},
-			{"-1.5e2", complex(-150, 0)},
-			{"1e-15", complex(1e-15, 0)},
-			{"3.141592653589793", complex(3.141592653589793, 0)},
+			{"1e3", complex(1000, 0)},                            // Scientific notation
+			{"1e-3", complex(0.001, 0)},                          // Small scientific notation
+			{"1E3", complex(1000, 0)},                            // Uppercase E
+			{"1e+3", complex(1000, 0)},                           // Explicit positive exponent
+			{"1.5e2", complex(150, 0)},                           // Fractional with exponent
+			{"-1.5e2", complex(-150, 0)},                         // Negative fractional with exponent
+			{"1e-15", complex(1e-15, 0)},                         // Very small scientific notation
+			{"3.141592653589793", complex(3.141592653589793, 0)}, // Pi with high precision
 			// Imaginary numbers only
-			{"1e3i", complex(0, 1000)},
-			{"1e-3i", complex(0, 0.001)},
-			{"42i", complex(0, 42)},
-			{"-42i", complex(0, -42)},
-			{"+42i", complex(0, 42)},
-			{"0i", complex(0, 0)},
-			{"1i", complex(0, 1)},
-			{"-1i", complex(0, -1)},
-			{"1.5i", complex(0, 1.5)},
+			{"1e3i", complex(0, 1000)},   // Scientific notation imaginary
+			{"1e-3i", complex(0, 0.001)}, // Small scientific notation imaginary
+			{"42i", complex(0, 42)},      // Basic imaginary
+			{"-42i", complex(0, -42)},    // Negative imaginary
+			{"+42i", complex(0, 42)},     // Explicit positive imaginary
+			{"0i", complex(0, 0)},        // Zero imaginary
+			{"1i", complex(0, 1)},        // Unit imaginary
+			{"-1i", complex(0, -1)},      // Negative unit imaginary
+			{"1.5i", complex(0, 1.5)},    // Fractional imaginary
 			// Scientific notation imaginary
-			{"1E3i", complex(0, 1000)},
-			{"1e+3i", complex(0, 1000)},
-			{"1.5e2i", complex(0, 150)},
-			{"-1.5e2i", complex(0, -150)},
-			{"1e-15i", complex(0, 1e-15)},
+			{"1E3i", complex(0, 1000)},    // Uppercase E imaginary
+			{"1e+3i", complex(0, 1000)},   // Explicit positive exponent imaginary
+			{"1.5e2i", complex(0, 150)},   // Fractional with exponent imaginary
+			{"-1.5e2i", complex(0, -150)}, // Negative fractional with exponent imaginary
+			{"1e-15i", complex(0, 1e-15)}, // Very small scientific notation imaginary
 			// Complex with scientific notation
-			{"1e3+2e2i", complex(1000, 200)},
-			{"1e-3+2e-2i", complex(0.001, 0.02)},
-			{"1.5e2-2.5e1i", complex(150, -25)},
-			{"1e-15+1e-15i", complex(1e-15, 1e-15)},
+			{"1e3+2e2i", complex(1000, 200)},        // Both parts scientific
+			{"1e-3+2e-2i", complex(0.001, 0.02)},    // Both parts small scientific
+			{"1.5e2-2.5e1i", complex(150, -25)},     // Mixed signs with scientific
+			{"1e-15+1e-15i", complex(1e-15, 1e-15)}, // Both parts very small scientific
 			// Decimal variations
-			{".5", complex(0.5, 0)},
-			{"-.5", complex(-0.5, 0)},
-			{"+.5", complex(0.5, 0)},
-			{"5.", complex(5.0, 0)},
-			{"-5.", complex(-5.0, 0)},
-			{"+5.", complex(5.0, 0)},
-			{".5i", complex(0, 0.5)},
-			{"-.5i", complex(0, -0.5)},
-			{"+.5i", complex(0, 0.5)},
-			{"5.i", complex(0, 5.0)},
-			{"-5.i", complex(0, -5.0)},
-			{"+5.i", complex(0, 5.0)},
+			{".5", complex(0.5, 0)},    // Leading decimal point
+			{"-.5", complex(-0.5, 0)},  // Negative leading decimal
+			{"+.5", complex(0.5, 0)},   // Positive leading decimal
+			{"5.", complex(5.0, 0)},    // Trailing decimal point
+			{"-5.", complex(-5.0, 0)},  // Negative trailing decimal
+			{"+5.", complex(5.0, 0)},   // Positive trailing decimal
+			{".5i", complex(0, 0.5)},   // Leading decimal imaginary
+			{"-.5i", complex(0, -0.5)}, // Negative leading decimal imaginary
+			{"+.5i", complex(0, 0.5)},  // Positive leading decimal imaginary
+			{"5.i", complex(0, 5.0)},   // Trailing decimal imaginary
+			{"-5.i", complex(0, -5.0)}, // Negative trailing decimal imaginary
+			{"+5.i", complex(0, 5.0)},  // Positive trailing decimal imaginary
 			// Complex decimal variations
-			{".5+.5i", complex(0.5, 0.5)},
-			{"5.+5.i", complex(5.0, 5.0)},
-			{".5-.5i", complex(0.5, -0.5)},
+			{".5+.5i", complex(0.5, 0.5)},  // Both parts leading decimal
+			{"5.+5.i", complex(5.0, 5.0)},  // Both parts trailing decimal
+			{".5-.5i", complex(0.5, -0.5)}, // Leading decimal with negative
 			// Very small and large numbers
-			{"2.2250738585072014e-308", complex(2.2250738585072014e-308, 0)}, // Near min positive
-			{"1.7976931348623157e+308", complex(1.7976931348623157e+308, 0)}, // Near max
-			{"4.9406564584124654e-324", complex(4.9406564584124654e-324, 0)}, // Min positive subnormal
-			{"2.2250738585072014e-308i", complex(0, 2.2250738585072014e-308)},
-			{"1.7976931348623157e+308i", complex(0, 1.7976931348623157e+308)},
-			{"4.9406564584124654e-324i", complex(0, 4.9406564584124654e-324)},
+			{"2.2250738585072014e-308", complex(2.2250738585072014e-308, 0)},  // Near min positive real
+			{"1.7976931348623157e+308", complex(1.7976931348623157e+308, 0)},  // Near max real
+			{"4.9406564584124654e-324", complex(4.9406564584124654e-324, 0)},  // Min positive subnormal real
+			{"2.2250738585072014e-308i", complex(0, 2.2250738585072014e-308)}, // Near min positive imaginary
+			{"1.7976931348623157e+308i", complex(0, 1.7976931348623157e+308)}, // Near max imaginary
+			{"4.9406564584124654e-324i", complex(0, 4.9406564584124654e-324)}, // Min positive subnormal imaginary
 			// Special values - infinity
-			{"inf", complex(math.Inf(1), 0)},
-			{"+inf", complex(math.Inf(1), 0)},
-			{"-inf", complex(math.Inf(-1), 0)},
-			{"Inf", complex(math.Inf(1), 0)},
-			{"infinity", complex(math.Inf(1), 0)},
-			{"Infinity", complex(math.Inf(1), 0)},
-			{"infi", complex(0, math.Inf(1))},
-			{"+infi", complex(0, math.Inf(1))},
-			{"-infi", complex(0, math.Inf(-1))},
-			{"Infi", complex(0, math.Inf(1))},
-			{"infinityi", complex(0, math.Inf(1))},
-			{"Infinityi", complex(0, math.Inf(1))},
+			{"inf", complex(math.Inf(1), 0)},       // Real infinity
+			{"+inf", complex(math.Inf(1), 0)},      // Positive real infinity
+			{"-inf", complex(math.Inf(-1), 0)},     // Negative real infinity
+			{"Inf", complex(math.Inf(1), 0)},       // Capitalized infinity
+			{"infinity", complex(math.Inf(1), 0)},  // Full word infinity
+			{"Infinity", complex(math.Inf(1), 0)},  // Capitalized full word infinity
+			{"infi", complex(0, math.Inf(1))},      // Imaginary infinity
+			{"+infi", complex(0, math.Inf(1))},     // Positive imaginary infinity
+			{"-infi", complex(0, math.Inf(-1))},    // Negative imaginary infinity
+			{"Infi", complex(0, math.Inf(1))},      // Capitalized imaginary infinity
+			{"infinityi", complex(0, math.Inf(1))}, // Full word imaginary infinity
+			{"Infinityi", complex(0, math.Inf(1))}, // Capitalized full word imaginary infinity
 			// Complex with special values
-			{"inf+1i", complex(math.Inf(1), 1)},
-			{"1+infi", complex(1, math.Inf(1))},
-			{"inf+infi", complex(math.Inf(1), math.Inf(1))},
-			{"-inf-infi", complex(math.Inf(-1), math.Inf(-1))},
+			{"inf+1i", complex(math.Inf(1), 1)},                // Real infinity with imaginary
+			{"1+infi", complex(1, math.Inf(1))},                // Real with imaginary infinity
+			{"inf+infi", complex(math.Inf(1), math.Inf(1))},    // Both infinities
+			{"-inf-infi", complex(math.Inf(-1), math.Inf(-1))}, // Both negative infinities
 			// Parentheses format
-			{"(42+42i)", complex(42, 42)},
-			{"(42)", complex(42, 0)},
-			{"(42i)", complex(0, 42)},
-			{"(-42-42i)", complex(-42, -42)},
+			{"(42+42i)", complex(42, 42)},    // Complex in parentheses
+			{"(42)", complex(42, 0)},         // Real in parentheses
+			{"(42i)", complex(0, 42)},        // Imaginary in parentheses
+			{"(-42-42i)", complex(-42, -42)}, // Negative complex in parentheses
 		},
 		fail: []decodeHookFailureTestCase[string, complex128]{
 			{strings.Repeat("42", 420)},
