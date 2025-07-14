@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"net"
 	"net/netip"
@@ -38,7 +39,7 @@ func (ts decodeHookTestSuite[F, T]) Run(t *testing.T) {
 	t.Run("Fail", func(t *testing.T) {
 		t.Parallel()
 
-		for _, tc := range ts.ok {
+		for _, tc := range ts.fail {
 			tc := tc
 
 			t.Run("", func(t *testing.T) {
@@ -333,83 +334,249 @@ func TestComposeDecodeHookFunc_ReflectValueHook(t *testing.T) {
 }
 
 func TestStringToSliceHookFunc(t *testing.T) {
-	f := StringToSliceHookFunc(",")
-
-	strValue := reflect.ValueOf("42")
-	sliceValue := reflect.ValueOf([]string{"42"})
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{sliceValue, sliceValue, []string{"42"}, false},
-		{reflect.ValueOf([]byte("42")), reflect.ValueOf([]byte{}), []byte("42"), false},
-		{strValue, strValue, "42", false},
-		{
-			reflect.ValueOf("foo,bar,baz"),
-			sliceValue,
-			[]string{"foo", "bar", "baz"},
-			false,
+	// Test comma separator
+	commaSuite := decodeHookTestSuite[string, []string]{
+		fn: StringToSliceHookFunc(","),
+		ok: []decodeHookTestCase[string, []string]{
+			{"foo,bar,baz", []string{"foo", "bar", "baz"}},
+			{"", []string{}},
+			{"single", []string{"single"}},
+			{"one,two", []string{"one", "two"}},
+			{"foo, bar, baz", []string{"foo", " bar", " baz"}}, // Preserves spaces
+			{"foo,,bar", []string{"foo", "", "bar"}},           // Empty elements
+			{",foo,bar,", []string{"", "foo", "bar", ""}},      // Leading/trailing separators
+			{"foo,bar,baz,", []string{"foo", "bar", "baz", ""}},
+			{",foo", []string{"", "foo"}},
+			{"foo,", []string{"foo", ""}},
+			{"a,b,c,d,e,f,g,h,i,j", []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}},
 		},
-		{
-			reflect.ValueOf(""),
-			sliceValue,
-			[]string{},
-			false,
+		fail: []decodeHookFailureTestCase[string, []string]{
+			// StringToSliceHookFunc doesn't have failure cases - it always succeeds
 		},
 	}
+	t.Run("CommaSeparator", commaSuite.Run)
 
-	for i, tc := range cases {
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, tc.err)
-		}
-		if !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
-		}
+	// Test semicolon separator
+	semicolonSuite := decodeHookTestSuite[string, []string]{
+		fn: StringToSliceHookFunc(";"),
+		ok: []decodeHookTestCase[string, []string]{
+			{"foo;bar;baz", []string{"foo", "bar", "baz"}},
+			{"", []string{}},
+			{"single", []string{"single"}},
+			{"one;two", []string{"one", "two"}},
+			{"foo; bar; baz", []string{"foo", " bar", " baz"}},
+			{"foo;;bar", []string{"foo", "", "bar"}},
+			{";foo;bar;", []string{"", "foo", "bar", ""}},
+		},
+		fail: []decodeHookFailureTestCase[string, []string]{},
 	}
+	t.Run("SemicolonSeparator", semicolonSuite.Run)
+
+	// Test pipe separator
+	pipeSuite := decodeHookTestSuite[string, []string]{
+		fn: StringToSliceHookFunc("|"),
+		ok: []decodeHookTestCase[string, []string]{
+			{"foo|bar|baz", []string{"foo", "bar", "baz"}},
+			{"", []string{}},
+			{"single", []string{"single"}},
+			{"foo||bar", []string{"foo", "", "bar"}},
+		},
+		fail: []decodeHookFailureTestCase[string, []string]{},
+	}
+	t.Run("PipeSeparator", pipeSuite.Run)
+
+	// Test space separator
+	spaceSuite := decodeHookTestSuite[string, []string]{
+		fn: StringToSliceHookFunc(" "),
+		ok: []decodeHookTestCase[string, []string]{
+			{"foo bar baz", []string{"foo", "bar", "baz"}},
+			{"", []string{}},
+			{"single", []string{"single"}},
+			{"foo  bar", []string{"foo", "", "bar"}}, // Double space creates empty element
+		},
+		fail: []decodeHookFailureTestCase[string, []string]{},
+	}
+	t.Run("SpaceSeparator", spaceSuite.Run)
+
+	// Test multi-character separator
+	multiCharSuite := decodeHookTestSuite[string, []string]{
+		fn: StringToSliceHookFunc("::"),
+		ok: []decodeHookTestCase[string, []string]{
+			{"foo::bar::baz", []string{"foo", "bar", "baz"}},
+			{"", []string{}},
+			{"single", []string{"single"}},
+			{"foo::::bar", []string{"foo", "", "bar"}},
+			{"::foo::bar::", []string{"", "foo", "bar", ""}},
+		},
+		fail: []decodeHookFailureTestCase[string, []string]{},
+	}
+	t.Run("MultiCharSeparator", multiCharSuite.Run)
+
+	// Test edge cases with custom logic for type conversion
+	t.Run("NonStringTypes", func(t *testing.T) {
+		f := StringToSliceHookFunc(",")
+
+		// Test that non-string types are passed through unchanged
+		sliceValue := reflect.ValueOf([]string{"42"})
+		actual, err := DecodeHookExec(f, sliceValue, sliceValue)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if !reflect.DeepEqual(actual, []string{"42"}) {
+			t.Fatalf("expected %v, got %v", []string{"42"}, actual)
+		}
+
+		// Test byte slice passthrough
+		byteValue := reflect.ValueOf([]byte("42"))
+		actual, err = DecodeHookExec(f, byteValue, reflect.ValueOf([]byte{}))
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if !reflect.DeepEqual(actual, []byte("42")) {
+			t.Fatalf("expected %v, got %v", []byte("42"), actual)
+		}
+
+		// Test string to string passthrough
+		strValue := reflect.ValueOf("42")
+		actual, err = DecodeHookExec(f, strValue, strValue)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if !reflect.DeepEqual(actual, "42") {
+			t.Fatalf("expected %v, got %v", "42", actual)
+		}
+	})
 }
 
 func TestStringToTimeDurationHookFunc(t *testing.T) {
-	f := StringToTimeDurationHookFunc()
+	suite := decodeHookTestSuite[string, time.Duration]{
+		fn: StringToTimeDurationHookFunc(),
+		ok: []decodeHookTestCase[string, time.Duration]{
+			// Basic units
+			{"5s", 5 * time.Second},
+			{"10ms", 10 * time.Millisecond},
+			{"100us", 100 * time.Microsecond},
+			{"1000ns", 1000 * time.Nanosecond},
+			{"2m", 2 * time.Minute},
+			{"3h", 3 * time.Hour},
+			{"24h", 24 * time.Hour},
 
-	timeValue := reflect.ValueOf(time.Duration(5))
-	strValue := reflect.ValueOf("")
-	cases := []struct {
-		f, t   reflect.Value
-		result any
-		err    bool
-	}{
-		{reflect.ValueOf("5s"), timeValue, 5 * time.Second, false},
-		{reflect.ValueOf("5"), timeValue, time.Duration(0), true},
-		{reflect.ValueOf("5"), strValue, "5", false},
+			// Combinations
+			{"1h30m", time.Hour + 30*time.Minute},
+			{"2h45m30s", 2*time.Hour + 45*time.Minute + 30*time.Second},
+			{"1m30s", time.Minute + 30*time.Second},
+			{"500ms", 500 * time.Millisecond},
+			{"1.5s", time.Second + 500*time.Millisecond},
+			{"2.5h", 2*time.Hour + 30*time.Minute},
+
+			// Zero values
+			{"0s", 0},
+			{"0ms", 0},
+			{"0h", 0},
+			{"0", 0},
+
+			// Negative durations
+			{"-5s", -5 * time.Second},
+			{"-1h30m", -(time.Hour + 30*time.Minute)},
+			{"-100ms", -100 * time.Millisecond},
+
+			// Fractional values
+			{"0.5s", 500 * time.Millisecond},
+			{"1.25m", time.Minute + 15*time.Second},
+			{"0.1h", 6 * time.Minute},
+			{"2.5ms", 2*time.Millisecond + 500*time.Microsecond},
+
+			// Large values
+			{"8760h", 8760 * time.Hour},       // 1 year
+			{"525600m", 525600 * time.Minute}, // 1 year in minutes
+			{"1000000us", 1000000 * time.Microsecond},
+
+			// Additional valid cases
+			{".5s", 500 * time.Millisecond},            // Leading decimal is valid
+			{"5µs", 5 * time.Microsecond},              // Unicode micro symbol is valid
+			{"5.s", 5 * time.Second},                   // Trailing decimal is valid
+			{"5s5m5s", 10*time.Second + 5*time.Minute}, // Duplicate units are valid
+		},
+		fail: []decodeHookFailureTestCase[string, time.Duration]{
+			{"5"},        // Missing unit
+			{"abc"},      // Invalid format
+			{""},         // Empty string
+			{"5x"},       // Invalid unit
+			{"5ss"},      // Double unit
+			{"5..5s"},    // Multiple decimals
+			{"++5s"},     // Double plus
+			{"--5s"},     // Double minus
+			{" 5s "},     // Whitespace not handled by time.ParseDuration
+			{"\t10ms\n"}, // Whitespace not handled by time.ParseDuration
+			{"\r1h\r"},   // Whitespace not handled by time.ParseDuration
+			{"5s "},      // Trailing space after unit
+			{" 5 s"},     // Space before unit
+			{"5 s 10 m"}, // Spaces in combined duration
+			{"∞s"},       // Unicode infinity
+			{"1y"},       // Unsupported unit (years)
+			{"1w"},       // Unsupported unit (weeks)
+			{"1d"},       // Unsupported unit (days)
+		},
 	}
 
-	for i, tc := range cases {
-		actual, err := DecodeHookExec(f, tc.f, tc.t)
-		if tc.err != (err != nil) {
-			t.Fatalf("case %d: expected err %#v", i, tc.err)
+	// Test non-string and non-duration type passthrough
+	t.Run("Passthrough", func(t *testing.T) {
+		f := StringToTimeDurationHookFunc()
+
+		// Non-string type should pass through
+		intValue := reflect.ValueOf(42)
+		actual, err := DecodeHookExec(f, intValue, reflect.ValueOf(time.Duration(0)))
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
 		}
-		if !reflect.DeepEqual(actual, tc.result) {
-			t.Fatalf(
-				"case %d: expected %#v, got %#v",
-				i, tc.result, actual)
+		if actual != 42 {
+			t.Fatalf("expected 42, got %v", actual)
 		}
-	}
+
+		// Non-duration target type should pass through
+		strValue := reflect.ValueOf("5s")
+		actual, err = DecodeHookExec(f, strValue, strValue)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if actual != "5s" {
+			t.Fatalf("expected '5s', got %v", actual)
+		}
+	})
+
+	suite.Run(t)
 }
 
 func TestStringToURLHookFunc(t *testing.T) {
-	urlSample, _ := url.Parse("http://example.com")
+	httpURL, _ := url.Parse("http://example.com")
+	httpsURL, _ := url.Parse("https://example.com")
+	ftpURL, _ := url.Parse("ftp://ftp.example.com")
+	fileURL, _ := url.Parse("file:///path/to/file")
+	complexURL, _ := url.Parse("https://user:pass@example.com:8080/path?query=value&foo=bar#fragment")
+	ipURL, _ := url.Parse("http://192.168.1.1:8080")
+	ipv6URL, _ := url.Parse("http://[::1]:8080")
+	emptyURL, _ := url.Parse("")
 
 	suite := decodeHookTestSuite[string, *url.URL]{
 		fn: StringToURLHookFunc(),
 		ok: []decodeHookTestCase[string, *url.URL]{
-			{"http://example.com", urlSample},
+			{"http://example.com", httpURL},
+			{"https://example.com", httpsURL},
+			{"ftp://ftp.example.com", ftpURL},
+			{"file:///path/to/file", fileURL},
+			{"https://user:pass@example.com:8080/path?query=value&foo=bar#fragment", complexURL},
+			{"http://192.168.1.1:8080", ipURL},
+			{"http://[::1]:8080", ipv6URL},
+			{"", emptyURL},
+			// Additional valid cases that url.Parse accepts
+			{"http://", func() *url.URL { u, _ := url.Parse("http://"); return u }()},
+			{"http://example.com:99999", func() *url.URL { u, _ := url.Parse("http://example.com:99999"); return u }()},
+			{"not a url at all", func() *url.URL { u, _ := url.Parse("not a url at all"); return u }()},
 		},
 		fail: []decodeHookFailureTestCase[string, *url.URL]{
 			{"http ://example.com"},
+			{"://invalid"},
+			{"http://[invalid:ipv6"},
 		},
 	}
 
@@ -451,10 +618,35 @@ func TestStringToIPHookFunc(t *testing.T) {
 	suite := decodeHookTestSuite[string, net.IP]{
 		fn: StringToIPHookFunc(),
 		ok: []decodeHookTestCase[string, net.IP]{
+			// IPv4 addresses
 			{"1.2.3.4", net.IPv4(0x01, 0x02, 0x03, 0x04)},
+			{"192.168.1.1", net.IPv4(192, 168, 1, 1)},
+			{"0.0.0.0", net.IPv4(0, 0, 0, 0)},
+			{"255.255.255.255", net.IPv4(255, 255, 255, 255)},
+			{"127.0.0.1", net.IPv4(127, 0, 0, 1)},
+			{"10.0.0.1", net.IPv4(10, 0, 0, 1)},
+			// IPv6 addresses
+			{"::1", net.ParseIP("::1")},
+			{"2001:db8::1", net.ParseIP("2001:db8::1")},
+			{"fe80::1", net.ParseIP("fe80::1")},
+			{"2001:0db8:85a3:0000:0000:8a2e:0370:7334", net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")},
+			{"2001:db8:85a3::8a2e:370:7334", net.ParseIP("2001:db8:85a3::8a2e:370:7334")},
+			{"::", net.ParseIP("::")},
+			{"::ffff:192.0.2.1", net.ParseIP("::ffff:192.0.2.1")},
 		},
 		fail: []decodeHookFailureTestCase[string, net.IP]{
 			{"5"},
+			{"256.1.1.1"},
+			{"1.2.3"},
+			{"1.2.3.4.5"},
+			{"not.an.ip.address"},
+			{""},
+			{"192.168.1.256"},
+			{"192.168.-1.1"},
+			{"gggg::1"},
+			{"2001:db8::1::2"},
+			{"[::1]"},
+			{"192.168.1.1:8080"},
 		},
 	}
 
@@ -676,6 +868,7 @@ func TestStructToMapHookFuncTabled(t *testing.T) {
 }
 
 func TestTextUnmarshallerHookFunc(t *testing.T) {
+
 	type MyString string
 
 	cases := []struct {
@@ -707,10 +900,34 @@ func TestStringToNetIPAddrHookFunc(t *testing.T) {
 	suite := decodeHookTestSuite[string, netip.Addr]{
 		fn: StringToNetIPAddrHookFunc(),
 		ok: []decodeHookTestCase[string, netip.Addr]{
+			// IPv4 addresses
 			{"192.0.2.1", netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01})},
+			{"127.0.0.1", netip.AddrFrom4([4]byte{127, 0, 0, 1})},
+			{"0.0.0.0", netip.AddrFrom4([4]byte{0, 0, 0, 0})},
+			{"255.255.255.255", netip.AddrFrom4([4]byte{255, 255, 255, 255})},
+			{"10.0.0.1", netip.AddrFrom4([4]byte{10, 0, 0, 1})},
+			{"192.168.1.100", netip.AddrFrom4([4]byte{192, 168, 1, 100})},
+			// IPv6 addresses
+			{"::1", netip.AddrFrom16([16]byte{15: 1})},
+			{"2001:db8::1", netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8, 12: 0, 0, 0, 1})},
+			{"fe80::1", netip.AddrFrom16([16]byte{0xfe, 0x80, 14: 0, 1})},
+			{"::", netip.AddrFrom16([16]byte{})},
+			{"::ffff:192.0.2.1", netip.AddrFrom16([16]byte{10: 0xff, 0xff, 0xc0, 0x00, 0x02, 0x01})},
 		},
 		fail: []decodeHookFailureTestCase[string, netip.Addr]{
 			{"5"},
+			{"256.1.1.1"},
+			{"1.2.3"},
+			{"1.2.3.4.5"},
+			{"not.an.ip.address"},
+			{""},
+			{"192.168.1.256"},
+			{"192.168.-1.1"},
+			{"gggg::1"},
+			{"2001:db8::1::2"},
+			{"[::1]"},
+			{"192.168.1.1:8080"},
+			{"192.168.1.1/24"},
 		},
 	}
 
@@ -721,10 +938,35 @@ func TestStringToNetIPAddrPortHookFunc(t *testing.T) {
 	suite := decodeHookTestSuite[string, netip.AddrPort]{
 		fn: StringToNetIPAddrPortHookFunc(),
 		ok: []decodeHookTestCase[string, netip.AddrPort]{
+			// IPv4 with ports
 			{"192.0.2.1:80", netip.AddrPortFrom(netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01}), 80)},
+			{"127.0.0.1:8080", netip.AddrPortFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), 8080)},
+			{"10.0.0.1:443", netip.AddrPortFrom(netip.AddrFrom4([4]byte{10, 0, 0, 1}), 443)},
+			{"192.168.1.100:22", netip.AddrPortFrom(netip.AddrFrom4([4]byte{192, 168, 1, 100}), 22)},
+			{"0.0.0.0:0", netip.AddrPortFrom(netip.AddrFrom4([4]byte{0, 0, 0, 0}), 0)},
+			{"255.255.255.255:65535", netip.AddrPortFrom(netip.AddrFrom4([4]byte{255, 255, 255, 255}), 65535)},
+			// IPv6 with ports
+			{"[::1]:80", netip.AddrPortFrom(netip.AddrFrom16([16]byte{15: 1}), 80)},
+			{"[2001:db8::1]:443", netip.AddrPortFrom(netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8, 12: 0, 0, 0, 1}), 443)},
+			{"[fe80::1]:8080", netip.AddrPortFrom(netip.AddrFrom16([16]byte{0xfe, 0x80, 14: 0, 1}), 8080)},
+			{"[::]:22", netip.AddrPortFrom(netip.AddrFrom16([16]byte{}), 22)},
+			{"[::ffff:192.0.2.1]:80", netip.AddrPortFrom(netip.AddrFrom16([16]byte{10: 0xff, 0xff, 0xc0, 0x00, 0x02, 0x01}), 80)},
 		},
 		fail: []decodeHookFailureTestCase[string, netip.AddrPort]{
 			{"5"},
+			{"192.168.1.1"},        // Missing port
+			{"192.168.1.1:"},       // Empty port
+			{"192.168.1.1:65536"},  // Port too large
+			{"192.168.1.1:-1"},     // Negative port
+			{"192.168.1.1:abc"},    // Non-numeric port
+			{"256.1.1.1:80"},       // Invalid IP
+			{"::1:80"},             // IPv6 without brackets
+			{"[::1"},               // Missing closing bracket
+			{"::1]:80"},            // Missing opening bracket
+			{"[invalid::ip]:80"},   // Invalid IPv6
+			{""},                   // Empty string
+			{":80"},                // Missing IP
+			{"192.168.1.1:80:443"}, // Multiple ports
 		},
 	}
 
@@ -735,11 +977,38 @@ func TestStringToNetIPPrefixHookFunc(t *testing.T) {
 	suite := decodeHookTestSuite[string, netip.Prefix]{
 		fn: StringToNetIPPrefixHookFunc(),
 		ok: []decodeHookTestCase[string, netip.Prefix]{
+			// IPv4 CIDR notation
 			{"192.0.2.1/24", netip.PrefixFrom(netip.AddrFrom4([4]byte{0xc0, 0x00, 0x02, 0x01}), 24)},
+			{"127.0.0.1/32", netip.PrefixFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), 32)},
+			{"10.0.0.0/8", netip.PrefixFrom(netip.AddrFrom4([4]byte{10, 0, 0, 0}), 8)},
+			{"192.168.1.0/24", netip.PrefixFrom(netip.AddrFrom4([4]byte{192, 168, 1, 0}), 24)},
+			{"172.16.0.0/12", netip.PrefixFrom(netip.AddrFrom4([4]byte{172, 16, 0, 0}), 12)},
+			{"0.0.0.0/0", netip.PrefixFrom(netip.AddrFrom4([4]byte{0, 0, 0, 0}), 0)},
+			{"255.255.255.255/32", netip.PrefixFrom(netip.AddrFrom4([4]byte{255, 255, 255, 255}), 32)},
+			{"192.168.1.1/30", netip.PrefixFrom(netip.AddrFrom4([4]byte{192, 168, 1, 1}), 30)},
+			// IPv6 CIDR notation
 			{"fd7a:115c::626b:430b/118", netip.PrefixFrom(netip.AddrFrom16([16]byte{0xfd, 0x7a, 0x11, 0x5c, 12: 0x62, 0x6b, 0x43, 0x0b}), 118)},
+			{"2001:db8::/32", netip.PrefixFrom(netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8}), 32)},
+			{"::1/128", netip.PrefixFrom(netip.AddrFrom16([16]byte{15: 1}), 128)},
+			{"::/0", netip.PrefixFrom(netip.AddrFrom16([16]byte{}), 0)},
+			{"fe80::/10", netip.PrefixFrom(netip.AddrFrom16([16]byte{0xfe, 0x80}), 10)},
+			{"2001:db8::1/64", netip.PrefixFrom(netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8, 12: 0, 0, 0, 1}), 64)},
+			{"::ffff:0:0/96", netip.PrefixFrom(netip.AddrFrom16([16]byte{10: 0xff, 0xff}), 96)},
 		},
 		fail: []decodeHookFailureTestCase[string, netip.Prefix]{
 			{"5"},
+			{"192.168.1.1"},       // Missing prefix length
+			{"192.168.1.1/"},      // Empty prefix length
+			{"192.168.1.1/33"},    // IPv4 prefix too large
+			{"192.168.1.1/-1"},    // Negative prefix
+			{"192.168.1.1/abc"},   // Non-numeric prefix
+			{"256.1.1.1/24"},      // Invalid IP
+			{"192.168.1.1/24/8"},  // Multiple prefixes
+			{"::1/129"},           // IPv6 prefix too large
+			{"invalid::ip/64"},    // Invalid IPv6
+			{""},                  // Empty string
+			{"/24"},               // Missing IP
+			{"192.168.1.1:80/24"}, // IP with port
 		},
 	}
 
@@ -800,11 +1069,50 @@ func TestStringToInt8HookFunc(t *testing.T) {
 			{"0x2a", int8(42)},
 			{"0X2A", int8(42)},
 			{"0", int8(0)},
+			{"+42", int8(42)},
+			// Boundary values
+			{"127", int8(127)},          // Max value
+			{"-128", int8(-128)},        // Min value
+			{"0x7F", int8(127)},         // Max value in hex
+			{"-0x80", int8(-128)},       // Min value in hex
+			{"0177", int8(127)},         // Max value in octal
+			{"-0200", int8(-128)},       // Min value in octal
+			{"0b01111111", int8(127)},   // Max value in binary
+			{"-0b10000000", int8(-128)}, // Min value in binary
+			// Zero variants
+			{"+0", int8(0)},
+			{"-0", int8(0)},
+			{"00", int8(0)},
+			{"0x0", int8(0)},
+			{"0b0", int8(0)},
+			{"0o0", int8(0)},
 		},
 		fail: []decodeHookFailureTestCase[string, int8]{
 			{strings.Repeat("42", 42)},
-			{"42.42"},
-			{"0.0"},
+			{"128"},          // Overflow
+			{"-129"},         // Underflow
+			{"256"},          // Way over max
+			{"-256"},         // Way under min
+			{"42.5"},         // Float
+			{"abc"},          // Non-numeric
+			{""},             // Empty string
+			{" 42 "},         // Whitespace not handled by strconv
+			{"\t42\n"},       // Whitespace not handled by strconv
+			{"\r42\r"},       // Whitespace not handled by strconv
+			{"0x"},           // Invalid hex
+			{"0b"},           // Invalid binary
+			{"0o"},           // Invalid octal
+			{"++42"},         // Double plus
+			{"--42"},         // Double minus
+			{"42abc"},        // Trailing non-numeric
+			{"abc42"},        // Leading non-numeric
+			{"42 43"},        // Multiple numbers
+			{"0x10000"},      // Hex overflow
+			{"-0x10001"},     // Hex underflow
+			{"0777"},         // Octal overflow
+			{"-01000"},       // Octal underflow
+			{"0b100000000"},  // Binary overflow
+			{"-0b100000001"}, // Binary underflow
 		},
 	}
 
@@ -822,12 +1130,42 @@ func TestStringToUint8HookFunc(t *testing.T) {
 			{"0x2a", uint8(42)},
 			{"0X2A", uint8(42)},
 			{"0", uint8(0)},
+
+			// Boundary values
+			{"255", uint8(255)},        // Max value
+			{"0xFF", uint8(255)},       // Max value in hex
+			{"0377", uint8(255)},       // Max value in octal
+			{"0b11111111", uint8(255)}, // Max value in binary
+			{"1", uint8(1)},            // Min positive value
+			// Zero variants
+
+			{"00", uint8(0)},
+			{"0x0", uint8(0)},
+			{"0b0", uint8(0)},
+			{"0o0", uint8(0)},
 		},
 		fail: []decodeHookFailureTestCase[string, uint8]{
 			{strings.Repeat("42", 42)},
-			{"42.42"},
-			{"-42"},
-			{"0.0"},
+			{"256"},         // Overflow
+			{"512"},         // Way over max
+			{"42.5"},        // Float
+			{"abc"},         // Non-numeric
+			{""},            // Empty string
+			{"-1"},          // Negative number
+			{"-42"},         // Negative number
+			{"0x"},          // Invalid hex
+			{"0b"},          // Invalid binary
+			{"0o"},          // Invalid octal
+			{"++42"},        // Double plus
+			{" 42 "},        // Whitespace not handled by strconv
+			{"\t42\n"},      // Whitespace not handled by strconv
+			{"\r42\r"},      // Whitespace not handled by strconv
+			{"42abc"},       // Trailing non-numeric
+			{"abc42"},       // Leading non-numeric
+			{"42 43"},       // Multiple numbers
+			{"0x100"},       // Hex overflow
+			{"0400"},        // Octal overflow
+			{"0b100000000"}, // Binary overflow
 		},
 	}
 
@@ -1027,12 +1365,87 @@ func TestStringToFloat32HookFunc(t *testing.T) {
 			{"0", float32(0)},
 			{"1e3", float32(1000)},
 			{"1e-3", float32(0.001)},
+			// Integer values
+			{"42", float32(42)},
+			{"-42", float32(-42)},
+			{"+42", float32(42)},
+			// Zero variants
+			{"0.0", float32(0.0)},
+			{"+0", float32(0)},
+			{"-0", float32(0)},
+			{"00.00", float32(0)},
+			// Scientific notation
+			{"1E3", float32(1000)},
+			{"1.5e2", float32(150)},
+			{"1.5E2", float32(150)},
+			{"-1.5e2", float32(-150)},
+			{"1e+3", float32(1000)},
+			{"1e-10", float32(1e-10)},
+			{"3.14159", float32(3.14159)},
+			// Special values
+			{"inf", float32(math.Inf(1))},
+			{"+inf", float32(math.Inf(1))},
+			{"-inf", float32(math.Inf(-1))},
+			{"Inf", float32(math.Inf(1))},
+			{"+Inf", float32(math.Inf(1))},
+			{"-Inf", float32(math.Inf(-1))},
+			{"infinity", float32(math.Inf(1))},
+			{"+infinity", float32(math.Inf(1))},
+			{"-infinity", float32(math.Inf(-1))},
+			{"Infinity", float32(math.Inf(1))},
+			{"+Infinity", float32(math.Inf(1))},
+			{"-Infinity", float32(math.Inf(-1))},
+			// Decimal variations
+			{".5", float32(0.5)},
+			{"-.5", float32(-0.5)},
+			{"+.5", float32(0.5)},
+			{"5.", float32(5.0)},
+			{"-5.", float32(-5.0)},
+			{"+5.", float32(5.0)},
+			// Very small and large numbers
+			{"1.1754943508222875e-38", float32(1.1754943508222875e-38)}, // Near min positive
+			{"3.4028234663852886e+38", float32(3.4028234663852886e+38)}, // Near max
+
 		},
 		fail: []decodeHookFailureTestCase[string, float32]{
 			{strings.Repeat("42", 420)},
 			{"42.42.42"},
+			{"abc"},      // Non-numeric
+			{""},         // Empty string
+			{"42abc"},    // Trailing non-numeric
+			{"abc42"},    // Leading non-numeric
+			{"42 43"},    // Multiple numbers
+			{"++42"},     // Double plus
+			{"--42"},     // Double minus
+			{"1e"},       // Incomplete scientific notation
+			{"1e+"},      // Incomplete scientific notation
+			{"1e-"},      // Incomplete scientific notation
+			{"1.2.3"},    // Multiple dots
+			{"1..2"},     // Double dots
+			{"."},        // Just a dot
+			{" 42.5 "},   // Whitespace not handled by strconv
+			{"\t42.5\n"}, // Whitespace not handled by strconv
+			{"\r42.5\r"}, // Whitespace not handled by strconv
+			{" 42.5 "},   // Whitespace not handled by strconv
+			{"\t42.5\n"}, // Whitespace not handled by strconv
+			{"\r42.5\r"}, // Whitespace not handled by strconv
+			{"1e1e1"},    // Multiple exponents
+			{"∞"},        // Unicode infinity
+			{"NaΝ"},      // Unicode NaN lookalike
 		},
 	}
+
+	// Custom test for NaN since NaN != NaN
+	t.Run("NaN", func(t *testing.T) {
+		f := StringToFloat32HookFunc()
+		actual, err := DecodeHookExec(f, reflect.ValueOf("nan"), reflect.ValueOf(float32(0)))
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if !math.IsNaN(float64(actual.(float32))) {
+			t.Fatalf("expected NaN, got %v", actual)
+		}
+	})
 
 	suite.Run(t)
 }
@@ -1047,12 +1460,82 @@ func TestStringToFloat64HookFunc(t *testing.T) {
 			{"0.0", float64(0)},
 			{"1e3", float64(1000)},
 			{"1e-3", float64(0.001)},
+			// Integer values
+			{"42", float64(42)},
+			{"-42", float64(-42)},
+			{"+42", float64(42)},
+			// Zero variants
+			{"+0", float64(0)},
+			{"-0", float64(0)},
+			{"00.00", float64(0)},
+			// Scientific notation
+			{"1E3", float64(1000)},
+			{"1.5e2", float64(150)},
+			{"1.5E2", float64(150)},
+			{"-1.5e2", float64(-150)},
+			{"1e+3", float64(1000)},
+			{"1e-15", float64(1e-15)},
+			{"3.141592653589793", float64(3.141592653589793)},
+			// Special values
+			// Special values - infinity
+			{"inf", math.Inf(1)},
+			{"+inf", math.Inf(1)},
+			{"-inf", math.Inf(-1)},
+			{"Inf", math.Inf(1)},
+			{"+Inf", math.Inf(1)},
+			{"-Inf", math.Inf(-1)},
+			{"infinity", math.Inf(1)},
+			{"+infinity", math.Inf(1)},
+			{"-infinity", math.Inf(-1)},
+			{"Infinity", math.Inf(1)},
+			{"+Infinity", math.Inf(1)},
+			{"-Infinity", math.Inf(-1)},
+			// Decimal variations
+			{".5", float64(0.5)},
+			{"-.5", float64(-0.5)},
+			{"+.5", float64(0.5)},
+			{"5.", float64(5.0)},
+			{"-5.", float64(-5.0)},
+			{"+5.", float64(5.0)},
+			// Very small and large numbers
+			{"2.2250738585072014e-308", float64(2.2250738585072014e-308)}, // Near min positive
+			{"1.7976931348623157e+308", float64(1.7976931348623157e+308)}, // Near max
+			{"4.9406564584124654e-324", float64(4.9406564584124654e-324)}, // Min positive subnormal
+
 		},
 		fail: []decodeHookFailureTestCase[string, float64]{
 			{strings.Repeat("42", 420)},
 			{"42.42.42"},
+			{"abc"},   // Non-numeric
+			{""},      // Empty string
+			{"42abc"}, // Trailing non-numeric
+			{"abc42"}, // Leading non-numeric
+			{"42 43"}, // Multiple numbers
+			{"++42"},  // Double plus
+			{"--42"},  // Double minus
+			{"1e"},    // Incomplete scientific notation
+			{"1e+"},   // Incomplete scientific notation
+			{"1e-"},   // Incomplete scientific notation
+			{"1.2.3"}, // Multiple dots
+			{"1..2"},  // Double dots
+			{"."},     // Just a dot
+			{"1e1e1"}, // Multiple exponents
+			{"∞"},     // Unicode infinity
+			{"NaΝ"},   // Unicode NaN lookalike
 		},
 	}
+
+	// Custom test for NaN since NaN != NaN
+	t.Run("NaN", func(t *testing.T) {
+		f := StringToFloat64HookFunc()
+		actual, err := DecodeHookExec(f, reflect.ValueOf("nan"), reflect.ValueOf(float64(0)))
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if !math.IsNaN(actual.(float64)) {
+			t.Fatalf("expected NaN, got %v", actual)
+		}
+	})
 
 	suite.Run(t)
 }
@@ -1061,20 +1544,251 @@ func TestStringToComplex64HookFunc(t *testing.T) {
 	suite := decodeHookTestSuite[string, complex64]{
 		fn: StringToComplex64HookFunc(),
 		ok: []decodeHookTestCase[string, complex64]{
+			// Standard complex numbers
 			{"42.42+42.42i", complex(float32(42.42), float32(42.42))},
+			{"1+2i", complex(float32(1), float32(2))},
+			{"-1-2i", complex(float32(-1), float32(-2))},
+			{"1-2i", complex(float32(1), float32(-2))},
+			{"-1+2i", complex(float32(-1), float32(2))},
+			// Real numbers only
 			{"-42.42", complex(float32(-42.42), 0)},
+			{"42", complex(float32(42), 0)},
+			{"+42", complex(float32(42), 0)},
 			{"0", complex(float32(0), 0)},
 			{"0.0", complex(float32(0), 0)},
+			{"+0", complex(float32(0), 0)},
+			{"-0", complex(float32(0), 0)},
+			// Scientific notation
 			{"1e3", complex(float32(1000), 0)},
 			{"1e-3", complex(float32(0.001), 0)},
+			{"1E3", complex(float32(1000), 0)},
+			{"1e+3", complex(float32(1000), 0)},
+			{"1.5e2", complex(float32(150), 0)},
+			{"-1.5e2", complex(float32(-150), 0)},
+			// Imaginary numbers only
 			{"1e3i", complex(float32(0), 1000)},
 			{"1e-3i", complex(float32(0), 0.001)},
+			{"42i", complex(float32(0), 42)},
+			{"-42i", complex(float32(0), -42)},
+			{"+42i", complex(float32(0), 42)},
+			{"0i", complex(float32(0), 0)},
+			{"1i", complex(float32(0), 1)},
+			{"-1i", complex(float32(0), -1)},
+			{"1.5i", complex(float32(0), 1.5)},
+			// Scientific notation imaginary
+			{"1E3i", complex(float32(0), 1000)},
+			{"1e+3i", complex(float32(0), 1000)},
+			{"1.5e2i", complex(float32(0), 150)},
+			{"-1.5e2i", complex(float32(0), -150)},
+			// Complex with scientific notation
+			{"1e3+2e2i", complex(float32(1000), float32(200))},
+			{"1e-3+2e-2i", complex(float32(0.001), float32(0.02))},
+			{"1.5e2-2.5e1i", complex(float32(150), float32(-25))},
+			// Decimal variations
+			{".5", complex(float32(0.5), 0)},
+			{"-.5", complex(float32(-0.5), 0)},
+			{"+.5", complex(float32(0.5), 0)},
+			{"5.", complex(float32(5.0), 0)},
+			{"-5.", complex(float32(-5.0), 0)},
+			{"+5.", complex(float32(5.0), 0)},
+			{".5i", complex(float32(0), 0.5)},
+			{"-.5i", complex(float32(0), -0.5)},
+			{"+.5i", complex(float32(0), 0.5)},
+			{"5.i", complex(float32(0), 5.0)},
+			{"-5.i", complex(float32(0), -5.0)},
+			{"+5.i", complex(float32(0), 5.0)},
+			// Complex decimal variations
+			{".5+.5i", complex(float32(0.5), float32(0.5))},
+			{"5.+5.i", complex(float32(5.0), float32(5.0))},
+			{".5-.5i", complex(float32(0.5), float32(-0.5))},
+			// Special values - infinity
+			{"inf", complex(float32(math.Inf(1)), 0)},
+			{"+inf", complex(float32(math.Inf(1)), 0)},
+			{"-inf", complex(float32(math.Inf(-1)), 0)},
+			{"Inf", complex(float32(math.Inf(1)), 0)},
+			{"infinity", complex(float32(math.Inf(1)), 0)},
+			{"Infinity", complex(float32(math.Inf(1)), 0)},
+			{"infi", complex(float32(0), float32(math.Inf(1)))},
+			{"+infi", complex(float32(0), float32(math.Inf(1)))},
+			{"-infi", complex(float32(0), float32(math.Inf(-1)))},
+			{"Infi", complex(float32(0), float32(math.Inf(1)))},
+			{"infinityi", complex(float32(0), float32(math.Inf(1)))},
+			{"Infinityi", complex(float32(0), float32(math.Inf(1)))},
+			// Complex with special values
+			{"inf+1i", complex(float32(math.Inf(1)), float32(1))},
+			{"1+infi", complex(float32(1), float32(math.Inf(1)))},
+			{"inf+infi", complex(float32(math.Inf(1)), float32(math.Inf(1)))},
+			{"-inf-infi", complex(float32(math.Inf(-1)), float32(math.Inf(-1)))},
+			// Parentheses format
+			{"(42+42i)", complex(float32(42), float32(42))},
+			{"(42)", complex(float32(42), float32(0))},
+			{"(42i)", complex(float32(0), float32(42))},
+			{"(-42-42i)", complex(float32(-42), float32(-42))},
 		},
 		fail: []decodeHookFailureTestCase[string, complex64]{
 			{strings.Repeat("42", 420)},
 			{"42.42.42"},
+			{"abc"},            // Non-numeric
+			{""},               // Empty string
+			{"42abc"},          // Trailing non-numeric
+			{"abc42"},          // Leading non-numeric
+			{"42+abc"},         // Invalid imaginary part
+			{"abc+42i"},        // Invalid real part
+			{"42++42i"},        // Double plus
+			{"42+-+42i"},       // Multiple signs
+			{"42+42j"},         // Wrong imaginary unit
+			{"42+42k"},         // Wrong imaginary unit
+			{"42 + 42i"},       // Spaces around operator
+			{"42+42i+1"},       // Extra components
+			{"42+42i+1i"},      // Multiple imaginary parts
+			{"42+42i+1+2i"},    // Too many components
+			{"(42+42i"},        // Unclosed parenthesis
+			{"42+42i)"},        // Extra closing parenthesis
+			{"((42+42i))"},     // Double parentheses
+			{"(42+42i)(1+1i)"}, // Multiple complex numbers
+			{"42i+42"},         // Imaginary first (not standard)
+			{"i"},              // Just 'i'
+			{"42.42.42+1i"},    // Invalid real part
+			{"42+42.42.42i"},   // Invalid imaginary part
+			{"1e"},             // Incomplete scientific notation
+			{"1e+"},            // Incomplete scientific notation
+			{"1e-"},            // Incomplete scientific notation
+			{"1e+i"},           // Incomplete scientific notation
+			{"1.2.3+1i"},       // Multiple dots in real
+			{"1+1.2.3i"},       // Multiple dots in imaginary
+			{"1..2+1i"},        // Double dots in real
+			{"1+1..2i"},        // Double dots in imaginary
+			{".+.i"},           // Just dots
+			{"1e1e1+1i"},       // Multiple exponents in real
+			{" 42+42i "},       // Whitespace not handled by strconv
+			{"\t42i\n"},        // Whitespace not handled by strconv
+			{"\r42\r"},         // Whitespace not handled by strconv
+			{" 42+42i "},       // Whitespace not handled by strconv
+			{"\t42i\n"},        // Whitespace not handled by strconv
+			{"\r42\r"},         // Whitespace not handled by strconv
+			{"1+1e1e1i"},       // Multiple exponents in imaginary
+			{"∞"},              // Unicode infinity
+			{"∞+∞i"},           // Unicode infinity complex
+			{"NaΝ"},            // Unicode NaN lookalike
 		},
 	}
+
+	// Custom test for NaN since NaN != NaN
+	t.Run("NaN", func(t *testing.T) {
+		f := StringToComplex64HookFunc()
+
+		// Test real NaN
+		actual, err := DecodeHookExec(f, reflect.ValueOf("nan"), reflect.ValueOf(complex64(0)))
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		c := actual.(complex64)
+		if !math.IsNaN(float64(real(c))) || imag(c) != 0 {
+			t.Fatalf("expected NaN+0i, got %v", c)
+		}
+
+		// Test imaginary NaN
+		actual, err = DecodeHookExec(f, reflect.ValueOf("nani"), reflect.ValueOf(complex64(0)))
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		c = actual.(complex64)
+		if real(c) != 0 || !math.IsNaN(float64(imag(c))) {
+			t.Fatalf("expected 0+NaNi, got %v", c)
+		}
+
+		// Test complex NaN
+		actual, err = DecodeHookExec(f, reflect.ValueOf("nan+nani"), reflect.ValueOf(complex64(0)))
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		c = actual.(complex64)
+		if !math.IsNaN(float64(real(c))) || !math.IsNaN(float64(imag(c))) {
+			t.Fatalf("expected NaN+NaNi, got %v", c)
+		}
+	})
+
+	suite.Run(t)
+}
+
+func TestStringToBoolHookFunc(t *testing.T) {
+	suite := decodeHookTestSuite[string, bool]{
+		fn: StringToBoolHookFunc(),
+		ok: []decodeHookTestCase[string, bool]{
+			// True values (only those accepted by strconv.ParseBool)
+			{"true", true},
+			{"True", true},
+			{"TRUE", true},
+			{"t", true},
+			{"T", true},
+			{"1", true},
+
+			// False values (only those accepted by strconv.ParseBool)
+			{"false", false},
+			{"False", false},
+			{"FALSE", false},
+			{"f", false},
+			{"F", false},
+			{"0", false},
+		},
+		fail: []decodeHookFailureTestCase[string, bool]{
+			{""},           // Empty string
+			{"maybe"},      // Invalid boolean
+			{"yes"},        // Not accepted by strconv.ParseBool
+			{"no"},         // Not accepted by strconv.ParseBool
+			{"on"},         // Not accepted by strconv.ParseBool
+			{"off"},        // Not accepted by strconv.ParseBool
+			{"y"},          // Not accepted by strconv.ParseBool
+			{"n"},          // Not accepted by strconv.ParseBool
+			{"yes please"}, // Invalid boolean
+			{"true false"}, // Multiple values
+			{"2"},          // Invalid number
+			{"-1"},         // Invalid number
+			{"10"},         // Invalid number
+			{"abc"},        // Non-boolean text
+			{"True False"}, // Multiple booleans
+			{"1.0"},        // Float
+			{"0.0"},        // Float
+			{"++true"},     // Invalid prefix
+			{"--false"},    // Invalid prefix
+			{"truee"},      // Typo
+			{"fasle"},      // Typo
+			{"tru"},        // Incomplete
+			{"fals"},       // Incomplete
+			{" true "},     // Whitespace not handled by strconv.ParseBool
+			{"\ttrue\n"},   // Whitespace not handled by strconv.ParseBool
+			{"\rfalse\r"},  // Whitespace not handled by strconv.ParseBool
+			{" 1 "},        // Whitespace not handled by strconv.ParseBool
+			{" 0 "},        // Whitespace not handled by strconv.ParseBool
+			{"∞"},          // Unicode
+			{"тrue"},       // Cyrillic lookalike
+		},
+	}
+
+	// Test non-string and non-bool type passthrough
+	t.Run("Passthrough", func(t *testing.T) {
+		f := StringToBoolHookFunc()
+
+		// Non-string type should pass through
+		intValue := reflect.ValueOf(42)
+		actual, err := DecodeHookExec(f, intValue, reflect.ValueOf(false))
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if actual != 42 {
+			t.Fatalf("expected 42, got %v", actual)
+		}
+
+		// Non-bool target type should pass through
+		strValue := reflect.ValueOf("true")
+		actual, err = DecodeHookExec(f, strValue, strValue)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if actual != "true" {
+			t.Fatalf("expected 'true', got %v", actual)
+		}
+	})
 
 	suite.Run(t)
 }
@@ -1083,20 +1797,174 @@ func TestStringToComplex128HookFunc(t *testing.T) {
 	suite := decodeHookTestSuite[string, complex128]{
 		fn: StringToComplex128HookFunc(),
 		ok: []decodeHookTestCase[string, complex128]{
+			// Standard complex numbers
 			{"42.42+42.42i", complex(42.42, 42.42)},
+			{"1+2i", complex(1, 2)},
+			{"-1-2i", complex(-1, -2)},
+			{"1-2i", complex(1, -2)},
+			{"-1+2i", complex(-1, 2)},
+			// Real numbers only
 			{"-42.42", complex(-42.42, 0)},
+			{"42", complex(42, 0)},
+			{"+42", complex(42, 0)},
 			{"0", complex(0, 0)},
 			{"0.0", complex(0, 0)},
+			{"+0", complex(0, 0)},
+			{"-0", complex(0, 0)},
+			// Scientific notation
 			{"1e3", complex(1000, 0)},
 			{"1e-3", complex(0.001, 0)},
+			{"1E3", complex(1000, 0)},
+			{"1e+3", complex(1000, 0)},
+			{"1.5e2", complex(150, 0)},
+			{"-1.5e2", complex(-150, 0)},
+			{"1e-15", complex(1e-15, 0)},
+			{"3.141592653589793", complex(3.141592653589793, 0)},
+			// Imaginary numbers only
 			{"1e3i", complex(0, 1000)},
 			{"1e-3i", complex(0, 0.001)},
+			{"42i", complex(0, 42)},
+			{"-42i", complex(0, -42)},
+			{"+42i", complex(0, 42)},
+			{"0i", complex(0, 0)},
+			{"1i", complex(0, 1)},
+			{"-1i", complex(0, -1)},
+			{"1.5i", complex(0, 1.5)},
+			// Scientific notation imaginary
+			{"1E3i", complex(0, 1000)},
+			{"1e+3i", complex(0, 1000)},
+			{"1.5e2i", complex(0, 150)},
+			{"-1.5e2i", complex(0, -150)},
+			{"1e-15i", complex(0, 1e-15)},
+			// Complex with scientific notation
+			{"1e3+2e2i", complex(1000, 200)},
+			{"1e-3+2e-2i", complex(0.001, 0.02)},
+			{"1.5e2-2.5e1i", complex(150, -25)},
+			{"1e-15+1e-15i", complex(1e-15, 1e-15)},
+			// Decimal variations
+			{".5", complex(0.5, 0)},
+			{"-.5", complex(-0.5, 0)},
+			{"+.5", complex(0.5, 0)},
+			{"5.", complex(5.0, 0)},
+			{"-5.", complex(-5.0, 0)},
+			{"+5.", complex(5.0, 0)},
+			{".5i", complex(0, 0.5)},
+			{"-.5i", complex(0, -0.5)},
+			{"+.5i", complex(0, 0.5)},
+			{"5.i", complex(0, 5.0)},
+			{"-5.i", complex(0, -5.0)},
+			{"+5.i", complex(0, 5.0)},
+			// Complex decimal variations
+			{".5+.5i", complex(0.5, 0.5)},
+			{"5.+5.i", complex(5.0, 5.0)},
+			{".5-.5i", complex(0.5, -0.5)},
+			// Very small and large numbers
+			{"2.2250738585072014e-308", complex(2.2250738585072014e-308, 0)}, // Near min positive
+			{"1.7976931348623157e+308", complex(1.7976931348623157e+308, 0)}, // Near max
+			{"4.9406564584124654e-324", complex(4.9406564584124654e-324, 0)}, // Min positive subnormal
+			{"2.2250738585072014e-308i", complex(0, 2.2250738585072014e-308)},
+			{"1.7976931348623157e+308i", complex(0, 1.7976931348623157e+308)},
+			{"4.9406564584124654e-324i", complex(0, 4.9406564584124654e-324)},
+			// Special values - infinity
+			{"inf", complex(math.Inf(1), 0)},
+			{"+inf", complex(math.Inf(1), 0)},
+			{"-inf", complex(math.Inf(-1), 0)},
+			{"Inf", complex(math.Inf(1), 0)},
+			{"infinity", complex(math.Inf(1), 0)},
+			{"Infinity", complex(math.Inf(1), 0)},
+			{"infi", complex(0, math.Inf(1))},
+			{"+infi", complex(0, math.Inf(1))},
+			{"-infi", complex(0, math.Inf(-1))},
+			{"Infi", complex(0, math.Inf(1))},
+			{"infinityi", complex(0, math.Inf(1))},
+			{"Infinityi", complex(0, math.Inf(1))},
+			// Complex with special values
+			{"inf+1i", complex(math.Inf(1), 1)},
+			{"1+infi", complex(1, math.Inf(1))},
+			{"inf+infi", complex(math.Inf(1), math.Inf(1))},
+			{"-inf-infi", complex(math.Inf(-1), math.Inf(-1))},
+			// Parentheses format
+			{"(42+42i)", complex(42, 42)},
+			{"(42)", complex(42, 0)},
+			{"(42i)", complex(0, 42)},
+			{"(-42-42i)", complex(-42, -42)},
 		},
 		fail: []decodeHookFailureTestCase[string, complex128]{
 			{strings.Repeat("42", 420)},
 			{"42.42.42"},
+			{"abc"},            // Non-numeric
+			{""},               // Empty string
+			{"42abc"},          // Trailing non-numeric
+			{"abc42"},          // Leading non-numeric
+			{"42+abc"},         // Invalid imaginary part
+			{"abc+42i"},        // Invalid real part
+			{"42++42i"},        // Double plus
+			{"42+-+42i"},       // Multiple signs
+			{"42+42j"},         // Wrong imaginary unit
+			{"42+42k"},         // Wrong imaginary unit
+			{"42 + 42i"},       // Spaces around operator
+			{"42+42i+1"},       // Extra components
+			{"42+42i+1i"},      // Multiple imaginary parts
+			{"42+42i+1+2i"},    // Too many components
+			{"(42+42i"},        // Unclosed parenthesis
+			{"42+42i)"},        // Extra closing parenthesis
+			{"((42+42i))"},     // Double parentheses
+			{"(42+42i)(1+1i)"}, // Multiple complex numbers
+			{"42i+42"},         // Imaginary first (not standard)
+			{"i"},              // Just 'i'
+			{"42.42.42+1i"},    // Invalid real part
+			{"42+42.42.42i"},   // Invalid imaginary part
+			{"1e"},             // Incomplete scientific notation
+			{"1e+"},            // Incomplete scientific notation
+			{"1e-"},            // Incomplete scientific notation
+			{"1e+i"},           // Incomplete scientific notation
+			{"1.2.3+1i"},       // Multiple dots in real
+			{"1+1.2.3i"},       // Multiple dots in imaginary
+			{"1..2+1i"},        // Double dots in real
+			{"1+1..2i"},        // Double dots in imaginary
+			{".+.i"},           // Just dots
+			{"1e1e1+1i"},       // Multiple exponents in real
+			{"1+1e1e1i"},       // Multiple exponents in imaginary
+			{"∞"},              // Unicode infinity
+			{"∞+∞i"},           // Unicode infinity complex
+			{"NaΝ"},            // Unicode NaN lookalike
 		},
 	}
+
+	// Custom test for NaN since NaN != NaN
+	t.Run("NaN", func(t *testing.T) {
+		f := StringToComplex128HookFunc()
+
+		// Test real NaN
+		actual, err := DecodeHookExec(f, reflect.ValueOf("nan"), reflect.ValueOf(complex128(0)))
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		c := actual.(complex128)
+		if !math.IsNaN(real(c)) || imag(c) != 0 {
+			t.Fatalf("expected NaN+0i, got %v", c)
+		}
+
+		// Test imaginary NaN
+		actual, err = DecodeHookExec(f, reflect.ValueOf("nani"), reflect.ValueOf(complex128(0)))
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		c = actual.(complex128)
+		if real(c) != 0 || !math.IsNaN(imag(c)) {
+			t.Fatalf("expected 0+NaNi, got %v", c)
+		}
+
+		// Test complex NaN
+		actual, err = DecodeHookExec(f, reflect.ValueOf("nan+nani"), reflect.ValueOf(complex128(0)))
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		c = actual.(complex128)
+		if !math.IsNaN(real(c)) || !math.IsNaN(imag(c)) {
+			t.Fatalf("expected NaN+NaNi, got %v", c)
+		}
+	})
 
 	suite.Run(t)
 }
