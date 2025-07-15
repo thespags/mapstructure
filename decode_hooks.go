@@ -183,6 +183,26 @@ func StringToTimeDurationHookFunc() DecodeHookFunc {
 	}
 }
 
+// StringToTimeLocationHookFunc returns a DecodeHookFunc that converts
+// strings to *time.Location.
+func StringToTimeLocationHookFunc() DecodeHookFunc {
+	return func(
+		f reflect.Type,
+		t reflect.Type,
+		data any,
+	) (any, error) {
+		if f.Kind() != reflect.String {
+			return data, nil
+		}
+		if t != reflect.TypeOf(time.Local) {
+			return data, nil
+		}
+		d, err := time.LoadLocation(data.(string))
+
+		return d, wrapTimeParseLocationError(err)
+	}
+}
+
 // StringToURLHookFunc returns a DecodeHookFunc that converts
 // strings to *url.URL.
 func StringToURLHookFunc() DecodeHookFunc {

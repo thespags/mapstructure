@@ -547,6 +547,35 @@ func TestStringToTimeDurationHookFunc(t *testing.T) {
 	suite.Run(t)
 }
 
+func TestStringToTimeLocationHookFunc(t *testing.T) {
+	newYork, _ := time.LoadLocation("America/New_York")
+	london, _ := time.LoadLocation("Europe/London")
+	tehran, _ := time.LoadLocation("Asia/Tehran")
+	shanghai, _ := time.LoadLocation("Asia/Shanghai")
+
+	suite := decodeHookTestSuite[string, *time.Location]{
+		fn: StringToTimeLocationHookFunc(),
+		ok: []decodeHookTestCase[string, *time.Location]{
+			{"UTC", time.UTC},
+			{"Local", time.Local},
+			{"America/New_York", newYork},
+			{"Europe/London", london},
+			{"Asia/Tehran", tehran},
+			{"Asia/Shanghai", shanghai},
+		},
+		fail: []decodeHookFailureTestCase[string, *time.Location]{
+			{"UTC2"},           // Non-existent
+			{"5s"},             // Duration-like, not a zone
+			{"Europe\\London"}, // Invalid path separator
+			{"../etc/passwd"},  // Unsafe path
+			{"/etc/zoneinfo"},  // Absolute path (rejected by stdlib)
+			{"Asia\\Tehran"},   // Invalid Windows-style path
+		},
+	}
+
+	suite.Run(t)
+}
+
 func TestStringToURLHookFunc(t *testing.T) {
 	httpURL, _ := url.Parse("http://example.com")
 	httpsURL, _ := url.Parse("https://example.com")
