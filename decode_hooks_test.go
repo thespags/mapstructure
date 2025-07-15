@@ -448,6 +448,63 @@ func TestStringToSliceHookFunc(t *testing.T) {
 	})
 }
 
+func TestStringToWeakSliceHookFunc(t *testing.T) {
+	f := StringToWeakSliceHookFunc(",")
+
+	strValue := reflect.ValueOf("42")
+	sliceValue := reflect.ValueOf([]string{"42"})
+	sliceValue2 := reflect.ValueOf([]byte("42"))
+
+	cases := []struct {
+		f, t   reflect.Value
+		result any
+		err    bool
+	}{
+		{sliceValue, sliceValue, []string{"42"}, false},
+		{sliceValue2, sliceValue2, []byte("42"), false},
+		{reflect.ValueOf([]byte("42")), reflect.ValueOf([]byte{}), []byte("42"), false},
+		{strValue, strValue, "42", false},
+		{
+			reflect.ValueOf("foo,bar,baz"),
+			sliceValue,
+			[]string{"foo", "bar", "baz"},
+			false,
+		},
+		{
+			reflect.ValueOf("foo,bar,baz"),
+			sliceValue2,
+			[]string{"foo", "bar", "baz"},
+			false,
+		},
+		{
+			reflect.ValueOf(""),
+			sliceValue,
+			[]string{},
+			false,
+		},
+		{
+			reflect.ValueOf(""),
+			sliceValue2,
+			[]string{},
+			false,
+		},
+	}
+
+	for i, tc := range cases {
+		actual, err := DecodeHookExec(f, tc.f, tc.t)
+
+		if tc.err != (err != nil) {
+			t.Fatalf("case %d: expected err %#v", i, tc.err)
+		}
+
+		if !reflect.DeepEqual(actual, tc.result) {
+			t.Fatalf(
+				"case %d: expected %#v, got %#v",
+				i, tc.result, actual)
+		}
+	}
+}
+
 func TestStringToTimeDurationHookFunc(t *testing.T) {
 	suite := decodeHookTestSuite[string, time.Duration]{
 		fn: StringToTimeDurationHookFunc(),
